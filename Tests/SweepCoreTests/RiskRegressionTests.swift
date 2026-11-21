@@ -207,6 +207,29 @@ import Testing
         #expect(r.error.count == 300_000)
     }
 
+    @Test func runnerDoesNotNeedAFreeDispatchThread() {
+        // On a busy Mac (or a 3-core CI machine running tests in parallel) every global-queue thread can be taken.
+        // The runner must still drain stderr, or a child that fills it blocks forever.
+        let release = DispatchSemaphore(value: 0)
+        let blockers = 256
+        for _ in 0..<blockers { DispatchQueue.global().async { release.wait(); release.signal() } }
+        defer { release.signal() }
+        Thread.sleep(forTimeInterval: 0.3) // let the blockers occupy the pool
+
+        final class Box: @unchecked Sendable { var result: CommandResult? }
+        let box = Box()
+        let finished = DispatchSemaphore(value: 0)
+        let worker = Thread {
+            box.result = ProcessRunner().run("/bin/sh", ["-c", "head -c 300000 /dev/zero | tr '\\0' e >&2; echo done"])
+            finished.signal()
+        }
+        worker.start()
+        let completed = finished.wait(timeout: .now() + 20) == .success
+        #expect(completed, "ProcessRunner deadlocked while the dispatch pool was busy")
+        #expect(box.result?.error.count == 300_000)
+        #expect(box.result?.output == "done\n")
+    }
+
     @Test func shredderRefusesItemsOnAnotherVolume() throws {
         let s = Sandbox()
         let url = s.file("~/mounted/data.bin", bytes: 500)

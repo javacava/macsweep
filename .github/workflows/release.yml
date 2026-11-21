@@ -43,6 +43,7 @@ jobs:
           echo "Version: $V"
 
       - name: Test
+        timeout-minutes: 15
         run: swift test
 
       - name: Build universal app (Apple silicon + Intel)

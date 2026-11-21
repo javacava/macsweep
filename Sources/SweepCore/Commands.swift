@@ -48,12 +48,19 @@ public struct ProcessRunner: CommandRunning {
         p.standardError = err
         do { try p.run() } catch { return CommandResult(status: -1, error: error.localizedDescription) }
         // Drain both pipes at once: reading them one after the other deadlocks when the child fills the second.
+        // stderr gets its own thread rather than a dispatch queue: when every pooled thread is busy (a loaded Mac,
+        // tests running in parallel) queued work may never start, and the child would block on a full pipe forever.
         final class Box: @unchecked Sendable { var data = Data() }
         let errBox = Box()
-        let group = DispatchGroup()
-        DispatchQueue.global().async(group: group) { errBox.data = err.fileHandleForReading.readDataToEndOfFile() }
+        let errDone = DispatchSemaphore(value: 0)
+        let errReader = Thread {
+            errBox.data = err.fileHandleForReading.readDataToEndOfFile()
+            errDone.signal()
+        }
+        errReader.name = "ProcessRunner stderr"
+        errReader.start()
         let o = out.fileHandleForReading.readDataToEndOfFile()
-        group.wait()
+        errDone.wait()
         p.waitUntilExit()
         return CommandResult(status: p.terminationStatus,
                              output: String(decoding: o, as: UTF8.self), error: String(decoding: errBox.data, as: UTF8.self))
