@@ -202,6 +202,12 @@ struct RootView: View {
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {
+            detail
+                .overlay(alignment: .bottom) { UndoToast() }
+        }
+    }
+
+    @ViewBuilder var detail: some View {
             switch state.selection ?? .quickScan {
             case .quickScan: QuickScanView()
             case .junk: JunkView()
@@ -222,7 +228,6 @@ struct RootView: View {
             case .monitor: MonitorView()
             case .battery: BatteryView()
             }
-        }
     }
 }
 
@@ -298,5 +303,40 @@ struct ExclusionsSettings: View {
     func remove(_ p: String) {
         AppState.exclusions.removeAll { $0 == p }
         state.exclusionsVersion += 1
+    }
+}
+
+/// "Moved 12 items to the Trash · Undo", shown for a while after each clean.
+struct UndoToast: View {
+    @ObservedObject var state = AppState.shared
+
+    var body: some View {
+        Group {
+            if let entry = state.lastClean {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash")
+                    Text("Moved \(entry.trashed.count) \(entry.trashed.count == 1 ? "item" : "items") to the Trash")
+                    Button("Undo") { state.undo(entry) }.buttonStyle(.borderedProminent).controlSize(.small)
+                    Button { state.lastClean = nil } label: { Image(systemName: "xmark") }.buttonStyle(.borderless)
+                }
+                .task(id: entry.id) {
+                    try? await Task.sleep(for: .seconds(20))
+                    if state.lastClean?.id == entry.id { state.lastClean = nil }
+                }
+            } else if let toast = state.toast {
+                Text(toast)
+                    .task(id: toast) {
+                        try? await Task.sleep(for: .seconds(6))
+                        if state.toast == toast { state.toast = nil }
+                    }
+            }
+        }
+        .font(.callout)
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .shadow(radius: 6)
+        .padding(.bottom, 70)
+        .opacity(state.lastClean == nil && state.toast == nil ? 0 : 1)
+        .animation(.easeOut(duration: 0.2), value: state.lastClean?.id)
     }
 }

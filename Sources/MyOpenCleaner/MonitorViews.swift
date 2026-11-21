@@ -162,8 +162,11 @@ struct ProcessTable: View {
 
 struct ActivitySummary: View {
     let log = AppState.shared.activity
+    @ObservedObject var state = AppState.shared
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            CleanHistoryList()
             Text("Activity").font(.headline)
             HStack(spacing: 30) {
                 stat("Freed in total", FileSize.format(log.totalFreed))
@@ -280,5 +283,39 @@ struct MenuBarLabel: View {
             Text("\(Int(m.cpu * 100))%").monospacedDigit()
         }
         .onAppear { m.start() }
+    }
+}
+
+/// Recent cleans, each with a Restore button while its items are still in the Trash.
+struct CleanHistoryList: View {
+    @ObservedObject var state = AppState.shared
+
+    var body: some View {
+        let entries = Array(state.history.entries.prefix(8))
+        if !entries.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Clean history").font(.headline)
+                ForEach(entries) { e in
+                    let restorable = state.history.restorableCount(e)
+                    HStack {
+                        Text(e.date.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
+                        Text(e.module)
+                        Text("\(e.removedCount) \(e.removedCount == 1 ? "item" : "items") · \(FileSize.format(e.freedBytes))").foregroundStyle(.secondary)
+                        Spacer()
+                        if e.restoredAt != nil {
+                            Text("Restored").foregroundStyle(.secondary)
+                        } else if restorable > 0 {
+                            Button("Restore \(restorable)") { state.undo(e) }.controlSize(.small)
+                        } else {
+                            Text(e.permanentCount == e.removedCount ? "Deleted for good" : "Trash emptied")
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .font(.caption)
+                }
+            }
+            .id(state.activityVersion)
+            .padding(.bottom, 10)
+        }
     }
 }

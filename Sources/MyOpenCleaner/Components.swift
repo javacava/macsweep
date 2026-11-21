@@ -148,6 +148,7 @@ struct FileIcon: View {
         case .image: return "photo"
         case .archive: return "doc.zipper"
         case .diskImage: return "opticaldiscdrive"
+        case .virtualMachine: return "macwindow.on.rectangle"
         case .document: return "doc.richtext"
         case .code: return "chevron.left.forwardslash.chevron.right"
         case .other: return "doc"

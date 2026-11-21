@@ -10,11 +10,21 @@ struct LargeOldView: View {
     @State private var minMB = 100.0
     @State private var onlyOld = false
     @State private var kind: FileKind?
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var message: String?
 
     var shown: [FileEntry] { (files ?? []).filter { kind == nil || $0.kind == kind } }
     var chosen: [FileEntry] { (files ?? []).filter { selected.contains($0.id) } }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = chosen.map(\.url)
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .largeOld, subtitle: "Large files, and files you have not opened for over a year, in your home folder.") {
@@ -42,7 +52,7 @@ struct LargeOldView: View {
                                 size: f.size)
                     }
                     ActionBar(selectedCount: chosen.count, selectedSize: chosen.reduce(0) { $0 + $1.size },
-                              buttonTitle: "Remove", busy: busy) { confirm = true }
+                              buttonTitle: "Remove", busy: busy) { askConfirm() }
                 }
             } else {
                 StateView(symbol: "doc.badge.clock", title: busy ? "Scanning your home folder…" : "Find what takes up space",
@@ -52,7 +62,7 @@ struct LargeOldView: View {
         .onAppear { if AppState.shared.autoScan, files == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) files?", isPresented: $confirm) {
             Button("Remove", role: .destructive) { remove(chosen.map { ($0.url, $0.size) }) }
-        }
+        } message: { if let inUse { Text(inUse) } }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }
@@ -88,6 +98,7 @@ struct DuplicatesView: View {
     @State private var selected = Set<String>()
     @State private var busy = false
     @State private var folder: URL?
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var message: String?
 
@@ -95,6 +106,15 @@ struct DuplicatesView: View {
     var chosen: [FileEntry] { all.filter { selected.contains($0.id) } }
     /// Never let the user delete every copy in a group.
     var unsafe: Bool { groups?.contains { g in g.files.allSatisfy { selected.contains($0.id) } } ?? false }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = chosen.map(\.url)
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .duplicates, subtitle: "Files with identical contents (SHA-256), whatever their names.") {
@@ -124,7 +144,7 @@ struct DuplicatesView: View {
                             Text("Every copy in a group is selected. Keep at least one.").foregroundStyle(.red).padding(6)
                         }
                         ActionBar(selectedCount: chosen.count, selectedSize: chosen.reduce(0) { $0 + $1.size },
-                                  buttonTitle: "Remove copies", busy: busy || unsafe) { confirm = true }
+                                  buttonTitle: "Remove copies", busy: busy || unsafe) { askConfirm() }
                     }
                 }
             } else {
@@ -136,7 +156,7 @@ struct DuplicatesView: View {
         .onAppear { if AppState.shared.autoScan, groups == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) copies?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
-        }
+        } message: { if let inUse { Text(inUse) } }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }
@@ -182,10 +202,20 @@ struct SimilarView: View {
     @State private var selected = Set<String>()
     @State private var busy = false
     @State private var folder: URL?
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var message: String?
 
     var chosen: [FileEntry] { (groups ?? []).flatMap { $0 }.filter { selected.contains($0.id) } }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = chosen.map(\.url)
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .similar, subtitle: "Similar photos: bursts, retakes, resized copies. The pictures are compared, not the files.") {
@@ -213,7 +243,7 @@ struct SimilarView: View {
                         Text("Similarity is a guess and can be wrong. Look at the photos before removing any.")
                             .font(.caption).foregroundStyle(.secondary).padding(.top, 4)
                         ActionBar(selectedCount: chosen.count, selectedSize: chosen.reduce(0) { $0 + $1.size },
-                                  buttonTitle: "Remove", busy: busy) { confirm = true }
+                                  buttonTitle: "Remove", busy: busy) { askConfirm() }
                     }
                 }
             } else {
@@ -225,7 +255,7 @@ struct SimilarView: View {
         .onAppear { if AppState.shared.autoScan, groups == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) photos?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
-        }
+        } message: { if let inUse { Text(inUse) } }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }

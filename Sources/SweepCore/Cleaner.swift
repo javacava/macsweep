@@ -43,7 +43,7 @@ public struct SafetyGuard: Sendable {
     var allowedTrees: [URL] {
         [env.home, env.root.appendingPathComponent("Library"), env.root.appendingPathComponent("Applications"),
          env.root.appendingPathComponent("private/var/log"), env.root.appendingPathComponent("Users/Shared"),
-         env.root.appendingPathComponent("private/tmp")]
+         env.root.appendingPathComponent("private/tmp"), env.root.appendingPathComponent("private/var/tmp")]
     }
 
     public func check(_ url: URL) -> Verdict {
@@ -109,22 +109,45 @@ public enum RemovalMode: String, Codable, Sendable, CaseIterable {
 }
 
 public protocol FileRemoving: Sendable {
-    func moveToTrash(_ url: URL) throws
+    /// Moves the item to the Trash and returns where it landed (nil when unknown).
+    @discardableResult func moveToTrash(_ url: URL) throws -> URL?
     func removePermanently(_ url: URL) throws
 }
 
 public struct SystemFileRemover: FileRemoving {
     public init() {}
-    public func moveToTrash(_ url: URL) throws { try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+    public func moveToTrash(_ url: URL) throws -> URL? {
+        var result: NSURL?
+        try FileManager.default.trashItem(at: url, resultingItemURL: &result)
+        return result as URL?
+    }
     public func removePermanently(_ url: URL) throws { try FileManager.default.removeItem(at: url) }
+}
+
+/// Something MyOpenCleaner moved to the Trash, and where it came from, so it can be put back.
+public struct TrashedItem: Codable, Equatable, Sendable {
+    public let original: URL
+    public let inTrash: URL
+    public let size: Int64
+
+    public init(original: URL, inTrash: URL, size: Int64) {
+        self.original = original; self.inTrash = inTrash; self.size = size
+    }
 }
 
 public struct CleanReport: Sendable {
     public var removed: [URL] = []
     public var failed: [(url: URL, reason: String)] = []
     public var freedBytes: Int64 = 0
+    /// The removed items that went to the Trash (the rest were deleted for good).
+    public var trashed: [TrashedItem] = []
 
     public init() {}
+
+    public mutating func merge(_ other: CleanReport) {
+        removed += other.removed; failed += other.failed
+        freedBytes += other.freedBytes; trashed += other.trashed
+    }
 }
 
 public struct Cleaner: Sendable {
@@ -155,7 +178,9 @@ public struct Cleaner: Sendable {
                 if mode == .permanent || t.url.isInside(trash) {
                     try remover.removePermanently(t.url)
                 } else {
-                    try remover.moveToTrash(t.url)
+                    if let landed = try remover.moveToTrash(t.url) {
+                        report.trashed.append(TrashedItem(original: t.url, inTrash: landed, size: t.size))
+                    }
                 }
                 report.removed.append(t.url)
                 report.freedBytes += t.size

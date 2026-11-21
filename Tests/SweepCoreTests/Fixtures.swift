@@ -82,10 +82,20 @@ final class RecordingRemover: FileRemoving, @unchecked Sendable {
 
     struct Failure: Error {}
 
-    func moveToTrash(_ url: URL) throws {
+    /// Where "trashed" items go. nil: they are simply deleted (and no landing place is reported).
+    var trashFolder: URL?
+
+    func moveToTrash(_ url: URL) throws -> URL? {
         if failOn.contains(url.lastPathComponent) { throw Failure() }
-        try FileManager.default.removeItem(at: url)
         lock.withLock { trashed.append(url) }
+        guard let trashFolder else {
+            try FileManager.default.removeItem(at: url)
+            return nil
+        }
+        try FileManager.default.createDirectory(at: trashFolder, withIntermediateDirectories: true)
+        let landed = trashFolder.appendingPathComponent(UUID().uuidString + "-" + url.lastPathComponent)
+        try FileManager.default.moveItem(at: url, to: landed)
+        return landed
     }
 
     func removePermanently(_ url: URL) throws {

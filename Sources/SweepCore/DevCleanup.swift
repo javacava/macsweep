@@ -3,7 +3,8 @@ import Foundation
 /// One thing the Developer page can remove: a simulator, a runtime, a firmware file, a cache, a build folder.
 public struct DevItem: Identifiable, Hashable, Sendable {
     public enum Group: String, CaseIterable, Sendable, Identifiable {
-        case simulators, runtimes, firmware, xcode, android, packageCaches, aiTools, builds
+        case simulators, runtimes, firmware, xcode, android, packageCaches, ideCaches, oldVersions, aiTools, aiModels,
+             heapDumps, builds
 
         public var id: String { rawValue }
 
@@ -16,6 +17,10 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .android: "Android emulators"
             case .packageCaches: "npm and other package manager caches"
             case .aiTools: "AI tool logs and caches"
+            case .ideCaches: "Editor and IDE caches"
+            case .oldVersions: "Old tool versions"
+            case .heapDumps: "Java heap dumps"
+            case .aiModels: "Downloaded AI models"
             case .builds: "Builds and dependencies in projects"
             }
         }
@@ -29,6 +34,10 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .android: "candybarphone"
             case .packageCaches: "shippingbox"
             case .aiTools: "brain"
+            case .ideCaches: "chevron.left.forwardslash.chevron.right"
+            case .oldVersions: "clock.arrow.circlepath"
+            case .heapDumps: "memorychip"
+            case .aiModels: "cube.box"
             case .builds: "folder.badge.gearshape"
             }
         }
@@ -41,7 +50,11 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .xcode: "Intermediate build files. Xcode rebuilds them; the first build takes longer."
             case .android: "Android Studio virtual devices and downloaded system images."
             case .packageCaches: "Downloaded packages. The package manager fetches them again when needed."
+            case .ideCaches: "Caches of VS Code, Cursor and JetBrains IDEs. Quit the editor first; it rebuilds them on the next start."
+            case .oldVersions: "Earlier versions that tools keep after an update, and Xcode's optional Metal toolchain. The version in use is never offered."
+            case .heapDumps: ".hprof files Java writes when a program runs out of memory. Useful only while you investigate that crash."
             case .aiTools: "Logs and caches of local AI apps such as Ollama and LM Studio. Downloaded models and chat history are never offered."
+            case .aiModels: "Models you downloaded for local AI apps. Nothing here is preselected: remove only models you no longer use; the app downloads them again if you need them."
             case .builds: "node_modules, .build, target, Pods and so on. Restored by the project's install or build command."
             }
         }
@@ -135,6 +148,31 @@ public struct DevFolderScanner: Sendable {
         .init(group: .packageCaches, title: "Cargo (git checkouts)", path: "~/.cargo/git/checkouts"),
         .init(group: .packageCaches, title: "Cargo (git database)", path: "~/.cargo/git/db", selected: false),
         .init(group: .packageCaches, title: "NuGet", path: "~/.nuget/packages", selected: false),
+        .init(group: .packageCaches, title: "Ruby gems (spec cache)", path: "~/.gem/specs"),
+        .init(group: .packageCaches, title: "Ruby gems (spec cache)", path: "~/.local/share/gem/specs"),
+        .init(group: .packageCaches, title: "Bundler", path: "~/.bundle/cache"),
+        .init(group: .packageCaches, title: "Composer", path: "~/Library/Caches/composer"),
+        .init(group: .packageCaches, title: "Composer", path: "~/.composer/cache"),
+        .init(group: .packageCaches, title: "Composer", path: "~/.cache/composer"),
+        .init(group: .packageCaches, title: "Bazel (disk cache)", path: "~/.cache/bazel", selected: false),
+        // Conda's package cache: environments hard-link into it, so removing it frees less than it shows.
+        .init(group: .packageCaches, title: "Conda packages (miniconda)", path: "~/miniconda3/pkgs", selected: false),
+        .init(group: .packageCaches, title: "Conda packages (anaconda)", path: "~/anaconda3/pkgs", selected: false),
+        .init(group: .packageCaches, title: "Conda packages (miniforge)", path: "~/miniforge3/pkgs", selected: false),
+        .init(group: .packageCaches, title: "Conda packages", path: "~/.conda/pkgs", selected: false),
+        // Editors and IDEs
+        .init(group: .ideCaches, title: "VS Code cache", path: "~/Library/Application Support/Code/Cache"),
+        .init(group: .ideCaches, title: "VS Code old versions data", path: "~/Library/Application Support/Code/CachedData"),
+        .init(group: .ideCaches, title: "VS Code extension downloads", path: "~/Library/Application Support/Code/CachedExtensionVSIXs"),
+        .init(group: .ideCaches, title: "VS Code code cache", path: "~/Library/Application Support/Code/Code Cache"),
+        .init(group: .ideCaches, title: "VS Code GPU cache", path: "~/Library/Application Support/Code/GPUCache"),
+        .init(group: .ideCaches, title: "VS Code logs", path: "~/Library/Application Support/Code/logs"),
+        .init(group: .ideCaches, title: "Cursor cache", path: "~/Library/Application Support/Cursor/Cache"),
+        .init(group: .ideCaches, title: "Cursor old versions data", path: "~/Library/Application Support/Cursor/CachedData"),
+        .init(group: .ideCaches, title: "Cursor code cache", path: "~/Library/Application Support/Cursor/Code Cache"),
+        .init(group: .ideCaches, title: "Cursor logs", path: "~/Library/Application Support/Cursor/logs"),
+        .init(group: .ideCaches, title: "JetBrains", path: "~/Library/Caches/JetBrains", mode: .children),
+        .init(group: .ideCaches, title: "JetBrains logs", path: "~/Library/Logs/JetBrains", mode: .children),
         // Local AI apps: logs and caches only, never models or conversations.
         .init(group: .aiTools, title: "Ollama logs", path: "~/.ollama/logs"),
         .init(group: .aiTools, title: "Ollama cache", path: "~/Library/Caches/ollama"),
@@ -165,6 +203,58 @@ public struct DevFolderScanner: Sendable {
             }
         }
         out += androidItems()
+        out += AIModelScanner(env: env).scan()
+        out += oldClaudeCodeVersions()
+        out += bazelOutput()
+        out += heapDumps()
+        return out
+    }
+
+    /// Claude Code's native installer keeps every version it downloaded in `~/.local/share/claude/versions`.
+    /// The one `~/.local/bin/claude` points to, and the newest, are kept.
+    func oldClaudeCodeVersions() -> [DevItem] {
+        let dir = env.resolve("~/.local/share/claude/versions")
+        let versions = FileManager.default.children(of: dir).filter { !$0.lastPathComponent.hasPrefix(".") }
+        guard versions.count > 1 else { return [] }
+        let link = env.resolve("~/.local/bin/claude")
+        let current = (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path))
+            .map { URL(fileURLWithPath: $0, relativeTo: link.deletingLastPathComponent()).standardizedFileURL.lastPathComponent }
+        let newest = versions.map(\.lastPathComponent).max { VersionCompare.compare($0, $1) == .orderedAscending }
+        return versions.filter { $0.lastPathComponent != current && $0.lastPathComponent != newest && !env.isExcluded($0) }
+            .compactMap { v in
+                let size = FileSize.of(v)
+                guard size > 0 else { return nil }
+                return DevItem(id: v.path, group: .oldVersions, title: "Claude Code \(v.lastPathComponent)",
+                               detail: "Older version · in use: \(current ?? newest ?? "?")", size: size,
+                               removal: .files([v]), selectedByDefault: true, location: v, lastUsed: v.modificationDate)
+            }
+    }
+
+    /// Bazel's output base lives outside the home folder: /private/var/tmp/_bazel_<user>.
+    func bazelOutput(user: String = NSUserName()) -> [DevItem] {
+        let dir = env.resolve("/private/var/tmp/_bazel_\(user)")
+        guard dir.isDirectoryURL, !env.isExcluded(dir) else { return [] }
+        let size = FileSize.of(dir)
+        guard size > 0 else { return [] }
+        return [DevItem(id: dir.path, group: .packageCaches, title: "Bazel (output base)", detail: env.displayPath(dir),
+                        size: size, removal: .files([dir]), selectedByDefault: false, location: dir)]
+    }
+
+    /// Java heap dumps (`*.hprof`) in the home folder, a few levels deep, outside ~/Library.
+    func heapDumps(maxDepth: Int = 4) -> [DevItem] {
+        var out: [DevItem] = []
+        let skip = [env.home.appendingPathComponent("Library"), env.home.appendingPathComponent(".Trash")]
+        guard let e = FileManager.default.enumerator(at: env.home, includingPropertiesForKeys: [.isRegularFileKey],
+                                                     options: [.skipsPackageDescendants]) else { return [] }
+        for case let url as URL in e {
+            if e.level > maxDepth || skip.contains(where: { url.isInside($0) }) { e.skipDescendants(); continue }
+            guard url.pathExtension.lowercased() == "hprof", !env.isExcluded(url) else { continue }
+            let size = FileSize.of(url)
+            guard size > 0 else { continue }
+            out.append(DevItem(id: url.path, group: .heapDumps, title: url.lastPathComponent,
+                               detail: env.displayPath(url.deletingLastPathComponent()), size: size,
+                               removal: .files([url]), selectedByDefault: true, location: url, lastUsed: url.modificationDate))
+        }
         return out
     }
 
@@ -197,6 +287,113 @@ public struct DevFolderScanner: Sendable {
     }
 }
 
+// MARK: - Local AI models
+
+/// Models downloaded by local AI apps. One item per model, never preselected.
+public struct AIModelScanner: Sendable {
+    public let env: SweepEnvironment
+    /// Files smaller than this are configs, not models.
+    static let minSize: Int64 = 10 * 1_048_576
+
+    public init(env: SweepEnvironment) { self.env = env }
+
+    /// Folders where each child is one model (file or folder).
+    static let folders: [(app: String, path: String)] = [
+        ("LM Studio", "~/.lmstudio/models"),
+        ("LM Studio", "~/.cache/lm-studio/models"),
+        ("GPT4All", "~/Library/Application Support/nomic.ai/GPT4All"),
+        ("Jan", "~/jan/models"),
+        ("Jan", "~/Library/Application Support/Jan/data/models"),
+        ("Draw Things", "~/Library/Containers/com.liuliu.draw-things/Data/Documents/Models"),
+        ("DiffusionBee", "~/.diffusionbee/downloads"),
+        ("MacWhisper", "~/Library/Application Support/MacWhisper/models"),
+        ("Whisper", "~/.cache/whisper"),
+        ("PyTorch Hub", "~/.cache/torch/hub/checkpoints"),
+    ]
+
+    public func scan() -> [DevItem] {
+        var out = ollama() + huggingFace()
+        let fm = FileManager.default
+        for (app, path) in Self.folders {
+            let dir = env.resolve(path)
+            // LM Studio keeps models as <publisher>/<model>; list the models, not the publishers.
+            let nested = app == "LM Studio"
+            let entries = nested ? fm.children(of: dir).filter(\.isDirectoryURL).flatMap { fm.children(of: $0) } : fm.children(of: dir)
+            for model in entries where !model.lastPathComponent.hasPrefix(".") && !env.isExcluded(model) {
+                let size = FileSize.of(model)
+                guard size >= Self.minSize else { continue }
+                let title = nested ? model.deletingLastPathComponent().lastPathComponent + "/" + model.lastPathComponent
+                                   : model.lastPathComponent
+                out.append(DevItem(id: model.path, group: .aiModels, title: title, detail: app, size: size,
+                                   removal: .files([model]), location: model, lastUsed: model.accessDate))
+            }
+        }
+        return out.sorted { $0.size > $1.size }
+    }
+
+    /// Hugging Face cache: `~/.cache/huggingface/hub/models--org--name`.
+    func huggingFace() -> [DevItem] {
+        let hub = env.resolve("~/.cache/huggingface/hub")
+        return FileManager.default.children(of: hub).compactMap { dir in
+            let name = dir.lastPathComponent
+            guard name.hasPrefix("models--") || name.hasPrefix("datasets--"), !env.isExcluded(dir) else { return nil }
+            let size = FileSize.of(dir)
+            guard size >= Self.minSize else { return nil }
+            let kind = name.hasPrefix("models--") ? "Hugging Face model" : "Hugging Face dataset"
+            let title = name.split(separator: "-", omittingEmptySubsequences: true).isEmpty ? name
+                : name.components(separatedBy: "--").dropFirst().joined(separator: "/")
+            return DevItem(id: dir.path, group: .aiModels, title: title, detail: kind, size: size,
+                           removal: .files([dir]), location: dir, lastUsed: dir.modificationDate)
+        }
+    }
+
+    /// Ollama stores models as manifests that point at shared, content-addressed blobs. A model's
+    /// removal takes its manifest and only the blobs no other model uses.
+    func ollama() -> [DevItem] {
+        let root = env.resolve("~/.ollama/models")
+        let manifestsDir = root.appendingPathComponent("manifests")
+        let blobsDir = root.appendingPathComponent("blobs")
+        guard let walker = FileManager.default.enumerator(at: manifestsDir, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }
+        var manifests: [(url: URL, name: String, digests: [String])] = []
+        for case let url as URL in walker {
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+                  let digests = Self.ollamaDigests(url) else { continue }
+            // manifests/<host>/<namespace>/<model>/<tag>
+            let parts = Array(url.pathComponents.suffix(3))
+            guard parts.count == 3 else { continue }
+            let name = (parts[0] == "library" ? "" : parts[0] + "/") + parts[1] + ":" + parts[2]
+            manifests.append((url, name, digests))
+        }
+        var refs: [String: Int] = [:]
+        for m in manifests { for d in Set(m.digests) { refs[d, default: 0] += 1 } }
+        return manifests.compactMap { m in
+            guard !env.isExcluded(m.url) else { return nil }
+            let blobs = Set(m.digests).map { blobsDir.appendingPathComponent($0.replacingOccurrences(of: ":", with: "-")) }
+                .filter { FileManager.default.fileExists(atPath: $0.path) }
+            let own = blobs.filter { refs[$0.lastPathComponent.replacingOccurrences(of: "sha256-", with: "sha256:")] == 1 }
+            let size = blobs.reduce(Int64(0)) { $0 + FileSize.of($1) }
+            let freed = own.reduce(Int64(0)) { $0 + FileSize.of($1) }
+            guard size >= Self.minSize else { return nil }
+            let shared = size - freed
+            let detail = "Ollama" + (shared > 0 ? " · \(FileSize.format(shared)) shared with other models stays" : "")
+            return DevItem(id: m.url.path, group: .aiModels, title: m.name, detail: detail, size: freed,
+                           removal: .files([m.url] + own), location: m.url, lastUsed: m.url.modificationDate)
+        }
+    }
+
+    /// Layer and config digests listed in an Ollama manifest.
+    static func ollamaDigests(_ manifest: URL) -> [String]? {
+        guard let data = try? Data(contentsOf: manifest),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        var digests: [String] = []
+        if let c = json["config"] as? [String: Any], let d = c["digest"] as? String { digests.append(d) }
+        for layer in json["layers"] as? [[String: Any]] ?? [] {
+            if let d = layer["digest"] as? String { digests.append(d) }
+        }
+        return digests.isEmpty ? nil : digests
+    }
+}
+
 // MARK: - iOS simulators and runtimes
 
 public struct SimulatorScanner: Sendable {
@@ -208,12 +405,34 @@ public struct SimulatorScanner: Sendable {
         self.env = env; self.runner = runner
     }
 
+    static let xcodebuild = "/usr/bin/xcodebuild"
+    static let metalAsset = "/System/Library/AssetsV2/com_apple_MobileAsset_MetalToolchain"
+
+    /// Xcode's downloadable Metal toolchain, removed with `xcodebuild -deleteComponent metaltoolchain`.
+    public func metalToolchain() -> [DevItem] {
+        let r = runner.run(Self.xcodebuild, ["-showComponent", "metaltoolchain"])
+        guard r.ok, Self.componentInstalled(r.output) else { return [] }
+        let size = FileSize.of(env.resolve(Self.metalAsset))
+        return [DevItem(id: "metal-toolchain", group: .oldVersions, title: "Metal Toolchain",
+                        detail: "Xcode component · needed only to compile Metal shaders; Xcode downloads it again on demand",
+                        size: size, removal: .command([Self.xcodebuild, "-deleteComponent", "metaltoolchain"]))]
+    }
+
+    /// `xcodebuild -showComponent` prints "Status: installed" or "Status: uninstalled".
+    public static func componentInstalled(_ output: String) -> Bool {
+        output.split(separator: "\n").contains { line in
+            let l = line.trimmingCharacters(in: .whitespaces).lowercased()
+            return l.hasPrefix("status:") && l.hasSuffix(" installed")
+        }
+    }
+
     public func scan() -> [DevItem] {
         let devices = runner.run(Self.xcrun, ["simctl", "list", "devices", "-j"])
         let runtimes = runner.run(Self.xcrun, ["simctl", "runtime", "list", "-j"])
         let deviceItems = devices.ok ? Self.parseDevices(Data(devices.output.utf8)) : []
         let usage = devices.ok ? Self.devicesPerRuntime(Data(devices.output.utf8)) : [:]
         return deviceItems + (runtimes.ok ? Self.parseRuntimes(Data(runtimes.output.utf8), devicesPerRuntime: usage) : [])
+            + metalToolchain()
     }
 
     /// "com.apple.CoreSimulator.SimRuntime.iOS-17-5" → "iOS 17.5".
@@ -283,55 +502,116 @@ public struct SimulatorScanner: Sendable {
 
 // MARK: - Build folders inside projects
 
+/// Finds a usable `git` without triggering the "install command line tools" prompt that the
+/// `/usr/bin/git` shim shows on Macs without them.
+public enum GitTool {
+    public static let candidates = ["/opt/homebrew/bin/git", "/usr/local/bin/git",
+                                    "/Library/Developer/CommandLineTools/usr/bin/git",
+                                    "/Applications/Xcode.app/Contents/Developer/usr/bin/git"]
+
+    public static var path: String? { candidates.first { FileManager.default.isExecutableFile(atPath: $0) } }
+}
+
 public struct BuildArtifactFinder: Sendable {
     public let env: SweepEnvironment
+    public let runner: CommandRunning
+    /// The git binary used to protect tracked files. nil: inside a repository only tool-specific
+    /// folders (node_modules, .build…) are offered, never generic ones (build, bin, target…).
+    public let git: String?
     public var maxDepth = 7
-    public init(env: SweepEnvironment) { self.env = env }
+
+    public init(env: SweepEnvironment, runner: CommandRunning = ProcessRunner(), git: String? = GitTool.path) {
+        self.env = env; self.runner = runner; self.git = git
+    }
 
     struct Kind {
         let folder: String
-        /// The folder counts only next to one of these (a `*.ext` entry matches by extension).
+        /// The folder counts only next to one of these. `*.ext` matches by extension, `a/b` must exist as a path.
         let markers: [String]
         let title: String
+        /// A common word (build, bin, target…). Inside a git repository such a folder must be git-ignored.
+        var generic = false
     }
 
+    static let node = ["package.json"]
+    static let python = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "tox.ini", "Pipfile"]
+    static let gradle = ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
+    static let dotnet = ["*.csproj", "*.fsproj", "*.vbproj", "*.sln"]
+
     static let kinds: [Kind] = [
-        Kind(folder: "node_modules", markers: ["package.json"], title: "Node dependencies"),
-        Kind(folder: ".next", markers: ["package.json"], title: "Next.js build"),
-        Kind(folder: ".nuxt", markers: ["package.json"], title: "Nuxt build"),
-        Kind(folder: ".turbo", markers: ["package.json"], title: "Turborepo cache"),
-        Kind(folder: ".parcel-cache", markers: ["package.json"], title: "Parcel cache"),
-        Kind(folder: ".angular", markers: ["package.json"], title: "Angular cache"),
-        Kind(folder: ".svelte-kit", markers: ["package.json"], title: "SvelteKit build"),
-        Kind(folder: ".expo", markers: ["package.json"], title: "Expo cache"),
+        Kind(folder: "node_modules", markers: node, title: "Node dependencies"),
+        Kind(folder: ".next", markers: node, title: "Next.js build"),
+        Kind(folder: ".nuxt", markers: node, title: "Nuxt build"),
+        Kind(folder: ".turbo", markers: node, title: "Turborepo cache"),
+        Kind(folder: ".parcel-cache", markers: node, title: "Parcel cache"),
+        Kind(folder: ".angular", markers: node, title: "Angular cache"),
+        Kind(folder: ".svelte-kit", markers: node, title: "SvelteKit build"),
+        Kind(folder: ".expo", markers: node, title: "Expo cache"),
         Kind(folder: ".build", markers: ["Package.swift"], title: "SwiftPM build"),
         Kind(folder: "DerivedData", markers: ["*.xcodeproj", "*.xcworkspace", "Package.swift"], title: "Project DerivedData"),
         Kind(folder: "Pods", markers: ["Podfile"], title: "CocoaPods"),
-        Kind(folder: "build", markers: ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts",
-                                        "pubspec.yaml", "CMakeLists.txt", "*.xcodeproj", "*.xcworkspace"], title: "build folder"),
-        Kind(folder: ".gradle", markers: ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"], title: "Project Gradle cache"),
-        Kind(folder: "target", markers: ["Cargo.toml", "pom.xml"], title: "Rust/Maven build"),
+        Kind(folder: "build", markers: gradle + ["pubspec.yaml", "CMakeLists.txt", "*.xcodeproj", "*.xcworkspace"],
+             title: "build folder", generic: true),
+        Kind(folder: ".gradle", markers: gradle, title: "Project Gradle cache"),
+        Kind(folder: "target", markers: ["Cargo.toml", "pom.xml"], title: "Rust/Maven build", generic: true),
         Kind(folder: ".dart_tool", markers: ["pubspec.yaml"], title: "Dart cache"),
+        // Python
+        Kind(folder: "__pycache__", markers: python, title: "Python bytecode"),
+        Kind(folder: ".mypy_cache", markers: python, title: "mypy cache"),
+        Kind(folder: ".pytest_cache", markers: python, title: "pytest cache"),
+        Kind(folder: ".ruff_cache", markers: python, title: "Ruff cache"),
+        Kind(folder: ".tox", markers: python, title: "tox environments"),
+        Kind(folder: ".nox", markers: python, title: "nox environments"),
+        Kind(folder: ".venv", markers: python, title: "Python virtual environment"),
+        Kind(folder: "venv", markers: python, title: "Python virtual environment", generic: true),
+        // Game engines
+        Kind(folder: "Library", markers: ["ProjectSettings/ProjectVersion.txt"], title: "Unity library", generic: true),
+        Kind(folder: "Temp", markers: ["ProjectSettings/ProjectVersion.txt"], title: "Unity temp", generic: true),
+        Kind(folder: "Obj", markers: ["ProjectSettings/ProjectVersion.txt"], title: "Unity obj", generic: true),
+        Kind(folder: "Logs", markers: ["ProjectSettings/ProjectVersion.txt"], title: "Unity logs", generic: true),
+        Kind(folder: "Binaries", markers: ["*.uproject"], title: "Unreal binaries", generic: true),
+        Kind(folder: "Intermediate", markers: ["*.uproject"], title: "Unreal intermediate", generic: true),
+        Kind(folder: "DerivedDataCache", markers: ["*.uproject"], title: "Unreal derived data"),
+        Kind(folder: ".godot", markers: ["project.godot"], title: "Godot cache"),
+        Kind(folder: ".import", markers: ["project.godot"], title: "Godot import cache"),
+        // Others
+        Kind(folder: "bin", markers: dotnet, title: ".NET bin", generic: true),
+        Kind(folder: "obj", markers: dotnet, title: ".NET obj", generic: true),
+        Kind(folder: ".terraform", markers: ["*.tf"], title: "Terraform providers"),
+        Kind(folder: "zig-cache", markers: ["build.zig"], title: "Zig cache"),
+        Kind(folder: ".zig-cache", markers: ["build.zig"], title: "Zig cache"),
+        Kind(folder: "_build", markers: ["mix.exs"], title: "Elixir build", generic: true),
+        Kind(folder: "deps", markers: ["mix.exs"], title: "Elixir dependencies", generic: true),
+        Kind(folder: ".stack-work", markers: ["stack.yaml"], title: "Haskell Stack build"),
     ]
 
     static let skippedTopLevel: Set<String> = ["Library", "Applications", "Pictures", "Movies", "Music", "Public"]
     static let packageExtensions: Set<String> = ["app", "xcodeproj", "xcworkspace", "framework", "bundle", "photoslibrary",
                                                  "xcarchive", "playground", "musiclibrary", "tvlibrary"]
 
-    static func matches(_ kind: Kind, siblings: Set<String>) -> Bool {
+    static func matches(_ kind: Kind, siblings: Set<String>, in dir: URL? = nil) -> Bool {
         kind.markers.contains { m in
-            m.hasPrefix("*.") ? siblings.contains { $0.hasSuffix(String(m.dropFirst())) } : siblings.contains(m)
+            if m.hasPrefix("*.") { return siblings.contains { $0.hasSuffix(String(m.dropFirst())) } }
+            if m.contains("/") {
+                guard let dir, siblings.contains(String(m.split(separator: "/")[0])) else { return false }
+                return FileManager.default.fileExists(atPath: dir.appendingPathComponent(m).path)
+            }
+            return siblings.contains(m)
         }
     }
 
     /// Finds re-creatable build folders under `roots` (default: the home folder).
     public func find(roots: [URL]? = nil, cancelled: () -> Bool = { false }) -> [DevItem] {
         var out: [DevItem] = []
-        for root in roots ?? [env.home] { visit(root, depth: 0, isHome: root.path == env.home.path, into: &out, cancelled: cancelled) }
+        var repos: [String: URL?] = [:]
+        for root in roots ?? [env.home] {
+            visit(root, depth: 0, isHome: root.path == env.home.path, into: &out, repos: &repos, cancelled: cancelled)
+        }
         return out.sorted { $0.size > $1.size }
     }
 
-    func visit(_ dir: URL, depth: Int, isHome: Bool, into out: inout [DevItem], cancelled: () -> Bool) {
+    func visit(_ dir: URL, depth: Int, isHome: Bool, into out: inout [DevItem], repos: inout [String: URL?],
+               cancelled: () -> Bool) {
         if cancelled() { return }
         let fm = FileManager.default
         guard let children = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey]) else { return }
@@ -342,15 +622,18 @@ public struct BuildArtifactFinder: Sendable {
             guard let v = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                   v.isDirectory == true, v.isSymbolicLink != true else { continue }
             if env.isExcluded(child) { continue }
-            if let kind = Self.kinds.first(where: { $0.folder == name }) {
+            let candidates = Self.kinds.filter { $0.folder == name }
+            if !candidates.isEmpty {
                 // An artifact name without its project marker (a random folder called "build") is left
                 // alone, and never entered: a stray node_modules is not walked either.
-                guard Self.matches(kind, siblings: names) else {
-                    if !name.hasPrefix("."), name != "node_modules", depth < maxDepth {
-                        visit(child, depth: depth + 1, isHome: false, into: &out, cancelled: cancelled)
+                guard let kind = candidates.first(where: { Self.matches($0, siblings: names, in: dir) }) else {
+                    if !name.hasPrefix("."), name != "node_modules", depth < maxDepth,
+                       !(isHome && Self.skippedTopLevel.contains(name)) {
+                        visit(child, depth: depth + 1, isHome: false, into: &out, repos: &repos, cancelled: cancelled)
                     }
                     continue
                 }
+                guard isSafeToOffer(child, kind: kind, repos: &repos) else { continue }
                 let size = FileSize.of(child)
                 guard size > 0 else { continue }
                 // Project activity: the newest change among the project's other top-level entries (incl. .git).
@@ -364,8 +647,44 @@ public struct BuildArtifactFinder: Sendable {
             }
             if name.hasPrefix(".") || Self.packageExtensions.contains(child.pathExtension.lowercased()) { continue }
             if isHome, Self.skippedTopLevel.contains(name) { continue }
-            if depth < maxDepth { visit(child, depth: depth + 1, isHome: false, into: &out, cancelled: cancelled) }
+            if depth < maxDepth { visit(child, depth: depth + 1, isHome: false, into: &out, repos: &repos, cancelled: cancelled) }
         }
+    }
+
+    // MARK: Git safety gate
+
+    /// Inside a git repository a folder is offered only when git agrees it is disposable:
+    /// nothing in it is tracked, it is not a nested repository, and generic names must be git-ignored.
+    func isSafeToOffer(_ folder: URL, kind: Kind, repos: inout [String: URL?]) -> Bool {
+        if FileManager.default.fileExists(atPath: folder.appendingPathComponent(".git").path) { return false }
+        guard let repo = repository(containing: folder.deletingLastPathComponent(), cache: &repos) else { return true }
+        guard let git else { return !kind.generic }
+        let rel = String(folder.standardizedFileURL.path.dropFirst(repo.standardizedFileURL.path.count + 1))
+        let tracked = runner.run(git, ["-C", repo.path, "ls-files", "-z", "--", rel])
+        guard tracked.ok, tracked.output.isEmpty else { return false }
+        if kind.generic {
+            return runner.run(git, ["-C", repo.path, "check-ignore", "-q", "--", rel]).status == 0
+        }
+        return true
+    }
+
+    /// The working tree root at or above `dir`.
+    func repository(containing dir: URL, cache: inout [String: URL?]) -> URL? {
+        var d = dir.standardizedFileURL
+        var visited: [String] = []
+        // Walk up to the home folder (for projects under it) or to the volume root (for a folder chosen elsewhere).
+        while true {
+            if let hit = cache[d.path] { visited.forEach { cache[$0] = hit }; return hit }
+            visited.append(d.path)
+            if FileManager.default.fileExists(atPath: d.appendingPathComponent(".git").path) {
+                visited.forEach { cache[$0] = d }
+                return d
+            }
+            if d.path == env.home.path || d.path == env.root.path || d.pathComponents.count <= 1 { break }
+            d = d.deletingLastPathComponent()
+        }
+        visited.forEach { cache[$0] = URL?.none }
+        return nil
     }
 }
 
@@ -383,6 +702,7 @@ public struct DevCleaner: Sendable {
 
     /// The only command shapes this type will ever run.
     static func isAllowed(_ argv: [String]) -> Bool {
+        if argv == [SimulatorScanner.xcodebuild, "-deleteComponent", "metaltoolchain"] { return true }
         guard argv.first == SimulatorScanner.xcrun, argv.count >= 4, argv[1] == "simctl",
               let id = argv.last, UUID(uuidString: id) != nil else { return false }
         return Array(argv[2..<argv.count - 1]) == ["delete"] || Array(argv[2..<argv.count - 1]) == ["runtime", "delete"]
@@ -412,10 +732,7 @@ public struct DevCleaner: Sendable {
                 }
             }
         }
-        let files = cleaner.remove(targets)
-        report.removed += files.removed
-        report.failed += files.failed
-        report.freedBytes += files.freedBytes
+        report.merge(cleaner.remove(targets))
         return report
     }
 }

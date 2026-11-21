@@ -27,6 +27,7 @@ struct UninstallerView: View {
     @State private var plan: UninstallPlan?
     @State private var selectedLeftovers = Set<String>()
     @State private var removeApp = true
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var busy = false
     @State private var message: String?
@@ -34,6 +35,15 @@ struct UninstallerView: View {
 
     var filtered: [AppInfo] {
         store.apps.filter { (!hideApple || !$0.isApple) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
+    }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = plan.map { $0.targets(includingApp: removeApp, selectedLeftovers: selectedLeftovers).map(\.url) } ?? []
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
     }
 
     var body: some View {
@@ -62,7 +72,7 @@ struct UninstallerView: View {
         .confirmationDialog(removeApp ? "Remove \(picked?.name ?? "")?" : "Reset \(picked?.name ?? "")?", isPresented: $confirm) {
             Button(removeApp ? "Remove" : "Reset", role: .destructive, action: uninstall)
         } message: {
-            Text(removeApp ? "The app and the selected leftovers will be removed." : "The app's settings and data will be removed; the app itself stays.")
+            Text((inUse.map { $0 + "\n\n" } ?? "") + (removeApp ? "The app and the selected leftovers will be removed." : "The app's settings and data will be removed; the app itself stays."))
         }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
@@ -103,7 +113,7 @@ struct UninstallerView: View {
                     }
                     let size = (removeApp ? plan.appSize : 0) + plan.leftovers.filter { selectedLeftovers.contains($0.id) }.reduce(0) { $0 + $1.size }
                     ActionBar(selectedCount: selectedLeftovers.count + (removeApp ? 1 : 0), selectedSize: size,
-                              buttonTitle: removeApp ? "Remove" : "Reset", busy: busy) { confirm = true }
+                              buttonTitle: removeApp ? "Remove" : "Reset", busy: busy) { askConfirm() }
                 }
                 .disabled(app.isApple)
                 .overlay { if app.isApple { Text("Apple apps are protected").padding().background(.regularMaterial, in: Capsule()) } }
@@ -152,10 +162,20 @@ struct LeftoversView: View {
     @State private var items: [Leftover]?
     @State private var selected = Set<String>()
     @State private var busy = false
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var message: String?
 
     var chosen: [Leftover] { items?.filter { selected.contains($0.id) } ?? [] }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = chosen.map(\.url)
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .leftovers, subtitle: "Files of apps that are already gone but whose settings and caches stayed behind.") {
@@ -172,7 +192,7 @@ struct LeftoversView: View {
                             FileRow(isOn: member($selected, l.id), url: l.url, detail: l.location, size: l.size)
                         }
                         ActionBar(selectedCount: chosen.count, selectedSize: chosen.reduce(0) { $0 + $1.size },
-                                  buttonTitle: "Remove", busy: busy) { confirm = true }
+                                  buttonTitle: "Remove", busy: busy) { askConfirm() }
                     }
                 }
             } else {
@@ -183,7 +203,7 @@ struct LeftoversView: View {
         .onAppear { if AppState.shared.autoScan, items == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) items?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: clean)
-        }
+        } message: { if let inUse { Text(inUse) } }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }

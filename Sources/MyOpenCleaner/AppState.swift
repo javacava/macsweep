@@ -82,6 +82,11 @@ final class AppState: ObservableObject {
 
     private let baseEnv: SweepEnvironment
     let activity: ActivityLog
+    /// Every clean, with where its items went in the Trash, for undo.
+    let history: CleanHistory
+    /// The clean that just finished, offered for undo in a toast.
+    @Published var lastClean: CleanHistoryEntry?
+    @Published var toast: String?
     /// Every external tool the pages call goes through this; the demo Mac swaps in canned answers.
     let runner: CommandRunning
     /// Pages scan as soon as they appear (screenshot mode only).
@@ -91,11 +96,13 @@ final class AppState: ObservableObject {
         if let demo = Demo.active {
             baseEnv = demo.env
             activity = ActivityLog(fileURL: demo.activityURL)
+            history = CleanHistory(fileURL: demo.base.appendingPathComponent("state/clean-history.json"))
             runner = demo.runner
             autoScan = true
         } else {
             baseEnv = .live
             activity = ActivityLog(fileURL: ActivityLog.defaultURL)
+            history = CleanHistory(fileURL: CleanHistory.defaultURL)
             runner = ProcessRunner()
             autoScan = false
         }
@@ -150,7 +157,31 @@ final class AppState: ObservableObject {
     func record(_ module: Module, _ report: CleanReport) {
         guard !report.removed.isEmpty else { return }
         activity.record(module: module.title, freed: report.freedBytes, items: report.removed.count)
+        if let entry = history.record(module: module.title, report: report), !entry.trashed.isEmpty {
+            lastClean = entry
+            toast = nil
+        }
         activityVersion += 1
+    }
+
+    /// Puts a clean's Trash items back where they were.
+    func undo(_ entry: CleanHistoryEntry) {
+        let history = history
+        Task {
+            let r = await AppState.background { history.restore(entry.id) }
+            lastClean = nil
+            toast = r.failed.isEmpty
+                ? "Restored \(r.restored.count) items."
+                : "Restored \(r.restored.count) items; \(r.failed.count) could not be restored (\(r.failed[0].reason))."
+            activityVersion += 1
+        }
+    }
+
+    /// A warning when programs have some of these files open, or nil.
+    func inUseWarning(_ urls: [URL]) async -> String? {
+        guard !urls.isEmpty else { return nil }
+        let runner = runner
+        return await AppState.background { OpenFiles.warning(for: OpenFiles.holders(of: urls, runner: runner)) }
     }
 
     func display(_ url: URL) -> String { env.displayPath(url) }

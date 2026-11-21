@@ -5,6 +5,7 @@ struct MalwareView: View {
     @ObservedObject var state = AppState.shared
     @State private var threats: [Threat]?
     @State private var checks: [SecurityCheck] = []
+    @State private var persistence: [PersistenceItem] = []
     @State private var selected = Set<String>()
     @State private var busy = false
     @State private var message: String?
@@ -19,31 +20,27 @@ struct MalwareView: View {
           VStack(spacing: 0) {
             ProtectionStatus(checks: checks)
             if let threats {
-                if threats.isEmpty {
-                    StateView(symbol: "checkmark.shield", title: "No threats found",
-                              message: "macOS also protects you with its built-in XProtect.")
-                } else {
-                    VStack(spacing: 0) {
-                        List(threats) { t in
-                            HStack(alignment: .top) {
-                                Toggle("", isOn: member($selected, t.id)).labelsHidden().toggleStyle(.checkbox)
-                                Image(systemName: t.level == .broken ? "exclamationmark.triangle" : "ladybug.fill")
-                                    .foregroundStyle(t.level == .known ? .red : t.level == .suspicious ? .orange : .secondary)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(t.item.label).font(.headline)
-                                    Text(t.level.title).font(.caption.bold()).foregroundStyle(t.level == .known ? .red : .orange)
-                                    ForEach(t.reasons, id: \.self) { Text("• " + $0).font(.caption) }
-                                    Text(state.display(t.item.plist)).font(.caption2).foregroundStyle(.secondary)
-                                    if let p = t.item.program { Text(p).font(.caption2).foregroundStyle(.secondary) }
-                                    if let app = t.appBundle {
-                                        Text("Only the launch item is turned off. Remove the \(app.deletingPathExtension().lastPathComponent) app itself with the Uninstaller.")
-                                            .font(.caption2).foregroundStyle(.orange)
-                                    }
+                VStack(spacing: 0) {
+                    List {
+                        Section("Launch agents and daemons") {
+                            if threats.isEmpty {
+                                Label("No threats found. macOS also protects you with its built-in XProtect.", systemImage: "checkmark.shield")
+                                    .foregroundStyle(.secondary)
+                            }
+                            ForEach(threats) { t in threatRow(t) }
+                        }
+                        ForEach(PersistenceItem.Kind.allCases, id: \.self) { kind in
+                            let rows = persistence.filter { $0.kind == kind }
+                            if !rows.isEmpty {
+                                Section {
+                                    ForEach(rows) { item in persistenceRow(item) }
+                                } header: {
+                                    Label("\(kind.title) (\(rows.count))", systemImage: kind.symbol)
                                 }
-                                Spacer()
-                                Button { AppState.reveal(t.item.plist) } label: { Image(systemName: "magnifyingglass") }.buttonStyle(.borderless)
                             }
                         }
+                    }
+                    if !threats.isEmpty {
                         ActionBar(selectedCount: chosen.count, selectedSize: 0, buttonTitle: "Remove", busy: busy) { confirm = true }
                     }
                 }
@@ -63,6 +60,45 @@ struct MalwareView: View {
         } message: { Text(message ?? "") }
     }
 
+    func threatRow(_ t: Threat) -> some View {
+        HStack(alignment: .top) {
+            Toggle("", isOn: member($selected, t.id)).labelsHidden().toggleStyle(.checkbox)
+            Image(systemName: t.level == .broken ? "exclamationmark.triangle" : "ladybug.fill")
+                .foregroundStyle(t.level == .known ? .red : t.level == .suspicious ? .orange : .secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(t.item.label).font(.headline)
+                Text(t.level.title).font(.caption.bold()).foregroundStyle(t.level == .known ? .red : .orange)
+                ForEach(t.reasons, id: \.self) { Text("• " + $0).font(.caption) }
+                Text(state.display(t.item.plist)).font(.caption2).foregroundStyle(.secondary)
+                if let p = t.item.program { Text(p).font(.caption2).foregroundStyle(.secondary) }
+                if let app = t.appBundle {
+                    Text("Only the launch item is turned off. Remove the \(app.deletingPathExtension().lastPathComponent) app itself with the Uninstaller.")
+                        .font(.caption2).foregroundStyle(.orange)
+                }
+            }
+            Spacer()
+            Button { AppState.reveal(t.item.plist) } label: { Image(systemName: "magnifyingglass") }.buttonStyle(.borderless)
+        }
+    }
+
+    /// Other autostart places are shown, never removed from here: open them in Finder to act.
+    func persistenceRow(_ item: PersistenceItem) -> some View {
+        HStack(alignment: .top) {
+            Image(systemName: item.level == nil ? "info.circle" : item.level == .known ? "ladybug.fill" : "exclamationmark.triangle")
+                .foregroundStyle(item.level == .known ? .red : item.level == .suspicious ? .orange : .secondary)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title).font(.callout).lineLimit(2).truncationMode(.middle)
+                Text(item.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                ForEach(item.reasons, id: \.self) { Text("• " + $0).font(.caption).foregroundStyle(.orange) }
+            }
+            Spacer()
+            if let url = item.url {
+                Button { AppState.reveal(url) } label: { Image(systemName: "magnifyingglass") }.buttonStyle(.borderless)
+            }
+        }
+    }
+
     func loadChecks() async {
         let env = state.env, runner = state.runner
         checks = await AppState.background { SecurityAudit(env: env, runner: runner).run() }
@@ -72,7 +108,11 @@ struct MalwareView: View {
         busy = true; threats = nil
         let env = state.env, runner = state.runner
         Task {
-            let t = await AppState.background { MalwareScanner(env: env).scan(LaunchItemsManager(env: env, runner: runner).items()) }
+            let (t, p) = await AppState.background { () -> ([Threat], [PersistenceItem]) in
+                (MalwareScanner(env: env).scan(LaunchItemsManager(env: env, runner: runner).items()),
+                 PersistenceScanner(env: env, runner: runner).scan())
+            }
+            persistence = p
             threats = t
             selected = Set(t.filter { $0.level == .known }.map(\.id))
             busy = false

@@ -22,10 +22,20 @@ struct ShredderView: View {
     @State private var targeted = false
     @State private var busy = false
     @State private var current = ""
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var message: String?
 
     var total: Int64 { queue.items.reduce(0) { $0 + (sizes[$1.path] ?? 0) } }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = queue.items
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .shredder, subtitle: "Drop files or folders here: their contents are overwritten with random data and deleted, bypassing the Trash.") {
@@ -67,7 +77,7 @@ struct ShredderView: View {
                     else if !queue.items.isEmpty { Button("Clear list") { queue.items = [] } }
                     Spacer()
                     Text(FileSize.format(total)).font(.title3.monospacedDigit().weight(.semibold))
-                    Button(action: { confirm = true }) {
+                    Button(action: { askConfirm() }) {
                         if busy { ProgressView().controlSize(.small).padding(.horizontal, 20) }
                         else { Label("Shred", systemImage: "scissors").padding(.horizontal, 6) }
                     }
@@ -82,7 +92,7 @@ struct ShredderView: View {
         .onAppear(perform: measure)
         .confirmationDialog("Shred \(queue.items.count) items permanently?", isPresented: $confirm) {
             Button("Shred", role: .destructive, action: shred)
-        } message: { Text("They will not go to the Trash and cannot be recovered.") }
+        } message: { Text((inUse.map { $0 + "\n\n" } ?? "") + "They will not go to the Trash and cannot be recovered.") }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }

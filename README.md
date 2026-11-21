@@ -6,7 +6,7 @@ MyOpenCleaner finds system junk, developer clutter, leftovers of removed apps, d
 
 - **Native and small**: one SwiftUI app, no Electron, no background daemon, no network calls except optional update checks.
 - **Safe by design**: every deletion passes one safety guard that protects system folders and your personal data.
-- **Tested**: 200+ tests run against fake Macs in temporary folders, so they never touch your files.
+- **Tested**: 250+ tests run against fake Macs in temporary folders, so they never touch your files.
 
 ![Quick Scan](docs/screenshots/quick-scan.png)
 
@@ -38,14 +38,14 @@ This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./bu
 |---|---|
 | **Quick Scan** | One scan across junk, threats, app leftovers and maintenance. Asks before cleaning and never needs a password. |
 | **System Junk** | User and system caches, logs, browser caches, caches inside sandboxed app containers, Xcode junk, package manager caches, Mail attachments older than 30 days, Trash, iOS backups, incomplete downloads, old installers. |
-| **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData, Xcode archives and XCTest devices, Android emulators, npm/npx/Yarn/pnpm/Bun/uv/pip/Poetry/Deno/CocoaPods/SwiftPM/Gradle/Cargo/Go/NuGet/Puppeteer caches, logs and caches of local AI tools (Ollama, LM Studio; never models or chats), project builds (`node_modules`, `.build`, `target`, `Pods`, `build`), and Docker build cache, images, containers and volumes. |
+| **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData, Xcode archives and XCTest devices, the optional Metal toolchain, Android emulators; package caches for npm/npx/Yarn/pnpm/Bun/uv/pip/Poetry/Conda/Deno/CocoaPods/SwiftPM/Gradle/Cargo/Go/NuGet/Ruby gems/Composer/Bazel/Puppeteer; VS Code, Cursor and JetBrains caches; older Claude Code versions (never the one in use); Java heap dumps; logs and caches of local AI tools; downloaded AI models (Ollama, LM Studio, Hugging Face, GPT4All, Jan, Draw Things, Whisper…, one row per model, never preselected; Ollama layers shared by other models are kept); project builds for Node, Swift, Rust, Python, Gradle, CocoaPods, Dart, Unity, Unreal, Godot, .NET, Terraform, Zig, Elixir and Haskell; Docker build cache, images, containers and volumes. |
 | **Cloud Files** | Large local copies from iCloud Drive, Dropbox, Google Drive and OneDrive. iCloud files can be kept in the cloud only. |
 
 ### Protection
 
 | Page | What it does |
 |---|---|
-| **Malware** | Shows the state of the Mac's own protection (FileVault, System Integrity Protection, Gatekeeper, firewall, XProtect definitions, automatic security updates) with a link to fix each one. Checks every launch agent and daemon against known adware and miner families, and flags suspicious ones: programs in `/tmp`, hidden folders, fake Apple names, unsigned binaries with random names. Also finds launch items whose app is gone. |
+| **Malware** | Also lists the other places code can start from: cron jobs, non-stock periodic scripts, suspicious lines in shell startup files, browser extensions (Chrome, Edge, Brave, Arc, Vivaldi, Firefox), Quick Look and Spotlight plug-ins, login authorization plug-ins, kernel and system extensions, and library injection through launch items. These are shown and revealed in Finder, never removed automatically. Shows the state of the Mac's own protection (FileVault, System Integrity Protection, Gatekeeper, firewall, XProtect definitions, automatic security updates) with a link to fix each one. Checks every launch agent and daemon against known adware and miner families, and flags suspicious ones: programs in `/tmp`, hidden folders, fake Apple names, unsigned binaries with random names. Also finds launch items whose app is gone. |
 | **Privacy** | Browsing history, cookies and autofill for Safari, Chrome, Edge, Brave and Firefox (every profile), recent items, saved Wi‑Fi networks. Passwords and bookmarks are never touched. |
 | **Shredder** | Drop files or folders on the window or the Dock icon. Contents are overwritten with random data (1, 3 or 7 passes) and deleted without going to the Trash. |
 
@@ -65,7 +65,7 @@ This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./bu
 | **Uninstaller** | Removes an app with everything it left in the Library folders, or resets it to a clean state. |
 | **Updater** | Checks apps that update through Sparkle and links to the App Store for the rest. |
 | **App Leftovers** | Finds settings and caches of apps that are no longer installed. |
-| **Large & Old Files** | Filters your home folder by size, age and kind. |
+| **Large & Old Files** | Filters your home folder by size, age and kind, including virtual machines (Parallels, UTM, VMware, VirtualBox disks), each counted as one item. |
 | **Duplicates** | Finds identical files by content (SHA-256). Always keeps at least one copy. |
 | **Similar Photos** | Groups bursts, retakes and resized copies with a perceptual hash. |
 | **Space Map** | A map of folder sizes you can click through. |
@@ -93,6 +93,9 @@ MyOpenCleaner is built to make the worst case boring.
 - **Trash first.** Everything goes to the Trash unless you switch to permanent deletion in Settings. Only privacy traces, the Shredder, simulators and Docker delete permanently, and each of them says so before it starts.
 - **Nothing preselected that you might miss.** Scanning changes nothing. Risky items (iOS backups, Xcode archives, installers, leftovers, simulators, project builds, duplicates, similar photos) start unselected.
 - **No silent removals.** Quick Scan asks before cleaning and only reports launch items; removing one is always your decision.
+- **Undo.** Every clean is recorded. Right after it, a toast offers Undo, and Mac Health → Clean history can put any clean whose items are still in the Trash back where they were. Nothing is ever overwritten on the way back.
+- **Nothing in use.** Before removing, MyOpenCleaner asks `lsof` which programs have the files open and names them in the confirmation, so you can quit them first.
+- **Git knows best.** In a git repository a build folder is offered only if nothing in it is tracked, it is not a nested repository, and generic names (`build`, `bin`, `target`, `venv`…) are git-ignored. Without a usable git, only tool-specific folders such as `node_modules` are offered there.
 - **Your exclusions win.** Add any file or folder in Settings → Exclusions, or right-click it in a list and choose "Never offer this again". Excluded paths, and everything inside them, are hidden from every page and refused by `SafetyGuard`.
 - **No shell.** External tools run with fixed arguments, and simulator IDs are validated as UUIDs before they reach a command line.
 - **Read-only checks stay read-only.** The protection status only asks macOS for its state; it never changes a setting.
@@ -153,6 +156,13 @@ These projects were studied for ideas. No code was copied from them; everything 
 | [tw93/Mole](https://github.com/tw93/Mole) | GPL-3.0 | Which junk categories are worth cleaning |
 | [alienator88/Pearcleaner](https://github.com/alienator88/Pearcleaner) | Apache 2.0 + Commons Clause | How to match an app's leftovers by bundle ID, name and container metadata |
 | [exelban/stats](https://github.com/exelban/stats) | MIT | Reading CPU and memory statistics |
+| [iliyami/MacSai](https://github.com/iliyami/MacSai) | BSD-3-Clause | A clean history with restore |
+| [guhcostan/mac-cleaner-cli](https://github.com/guhcostan/mac-cleaner-cli) | MIT | Checking git before removing build folders |
+| [jithin-sabu/purge-app](https://github.com/jithin-sabu/purge-app) | MIT | Local AI model stores, the Metal toolchain, VM bundles |
+| [tbillington/kondo](https://github.com/tbillington/kondo), [bysiber/cleardisk](https://github.com/bysiber/cleardisk) | MIT | More project types and developer cache locations |
+| [objective-see/KnockKnock](https://github.com/objective-see/KnockKnock) | GPL-3.0 | The list of places to look for persistence (no code used) |
+| [sveinbjornt/Sloth](https://github.com/sveinbjornt/Sloth) | BSD-3-Clause | Asking `lsof` which programs hold files open |
+| [2ykwang/mac-cleanup-go](https://github.com/2ykwang/mac-cleanup-go), [mac-cleanup/mac-cleanup-py](https://github.com/mac-cleanup/mac-cleanup-py) | MIT, Apache-2.0 | Old Claude Code versions, Java heap dumps |
 | [momenbasel/PureMac](https://github.com/momenbasel/PureMac) | MIT | Extra developer and AI-tool cache locations, sandbox container caches, the protection status, exclusions, a real Full Disk Access check, a command-line clean |
 
 ## License

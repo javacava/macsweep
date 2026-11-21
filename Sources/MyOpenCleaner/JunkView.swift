@@ -8,10 +8,20 @@ struct JunkView: View {
     @State private var busy = false
     @State private var progress = ""
     @State private var expanded = Set<JunkCategory>()
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var message: String?
 
     var selectedItems: [JunkItem] { result?.items.filter { selected.contains($0.id) } ?? [] }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = selectedItems.map(\.url)
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .junk, subtitle: "Caches, logs, Xcode and developer junk, mail attachments, Trash, incomplete downloads.") {
@@ -32,7 +42,7 @@ struct JunkView: View {
                             ForEach(result.categories) { cat in categorySection(cat, result) }
                         }
                         ActionBar(selectedCount: selectedItems.count, selectedSize: selectedItems.reduce(0) { $0 + $1.size },
-                                  buttonTitle: "Clean", busy: busy) { confirm = true }
+                                  buttonTitle: "Clean", busy: busy) { askConfirm() }
                     }
                 }
             } else {
@@ -45,7 +55,7 @@ struct JunkView: View {
         .confirmationDialog("Clean \(FileSize.format(selectedItems.reduce(0) { $0 + $1.size }))?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: clean)
         } message: {
-            Text("Apps rebuild the caches they need. Quit browsers before clearing their caches.")
+            Text((inUse.map { $0 + "\n\n" } ?? "") + "Apps rebuild the caches they need. Quit browsers before clearing their caches.")
         }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}

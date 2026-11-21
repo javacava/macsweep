@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 public enum FileKind: String, CaseIterable, Sendable, Codable {
-    case video, audio, image, archive, diskImage, document, code, other
+    case video, audio, image, archive, diskImage, virtualMachine, document, code, other
 
     public var title: String {
         switch self {
@@ -11,6 +11,7 @@ public enum FileKind: String, CaseIterable, Sendable, Codable {
         case .image: "Images"
         case .archive: "Archives"
         case .diskImage: "Disk images"
+        case .virtualMachine: "Virtual machines"
         case .document: "Documents"
         case .code: "Code"
         case .other: "Other"
@@ -23,7 +24,8 @@ public enum FileKind: String, CaseIterable, Sendable, Codable {
         case "mp3", "m4a", "wav", "aiff", "aif", "flac", "aac", "ogg": .audio
         case "jpg", "jpeg", "png", "heic", "gif", "tiff", "tif", "bmp", "webp", "raw", "cr2", "nef", "dng", "psd": .image
         case "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz": .archive
-        case "dmg", "iso", "img", "pkg", "xip", "vmdk", "qcow2", "sparseimage", "sparsebundle": .diskImage
+        case "pvm", "utm", "vmwarevm", "vbox", "vmdk", "vdi", "qcow2", "hdd", "macvm", "vmx": .virtualMachine
+        case "dmg", "iso", "img", "pkg", "xip", "sparseimage", "sparsebundle": .diskImage
         case "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pages", "numbers", "key", "txt", "rtf", "epub": .document
         case "swift", "js", "ts", "py", "c", "h", "m", "java", "go", "rs", "json": .code
         default: .other
@@ -42,6 +44,8 @@ public struct FileEntry: Identifiable, Hashable, Sendable {
 
 /// Walks a folder tree for regular files, skipping hidden items, app bundles' insides and `~/Library`.
 public struct FileWalker: Sendable {
+    static let vmBundles: Set<String> = ["pvm", "utm", "vmwarevm", "macvm"]
+
     public var skip: [URL]
     public var includeHidden = false
 
@@ -61,7 +65,9 @@ public struct FileWalker: Sendable {
             if skip.contains(where: { url.isInside($0) }) { e.skipDescendants(); continue }
             guard let v = try? url.resourceValues(forKeys: Set(keys)) else { continue }
             let size: Int64
-            if v.isPackage == true {
+            // VM bundles are folders; count them as one item even when their app is not installed.
+            if v.isPackage == true || Self.vmBundles.contains(url.pathExtension.lowercased()) {
+                e.skipDescendants()
                 size = FileSize.of(url)
             } else {
                 guard v.isRegularFile == true, v.isSymbolicLink != true else { continue }

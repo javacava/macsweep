@@ -12,6 +12,7 @@ struct DeveloperView: View {
     @State private var projectsRoot: URL?
     @State private var docker: DockerCleaner.State = .notInstalled
     @State private var dockerSelected = Set(DockerPrune.allCases.filter(\.selectedByDefault))
+    @State private var inUse: String?
     @State private var confirm = false
     @State private var confirmDocker = false
     @State private var message: String?
@@ -19,6 +20,15 @@ struct DeveloperView: View {
     var chosen: [DevItem] { items?.filter { selected.contains($0.id) } ?? [] }
     var chosenSize: Int64 { chosen.reduce(0) { $0 + $1.size } }
     var hasCommands: Bool { chosen.contains { if case .command = $0.removal { true } else { false } } }
+
+    /// Checks whether running programs hold any of the files, then asks for confirmation.
+    func askConfirm() {
+        let urls: [URL] = chosen.flatMap { item -> [URL] in if case .files(let u) = item.removal { return u }; return [] }
+        Task {
+            inUse = await AppState.shared.inUseWarning(urls)
+            confirm = true
+        }
+    }
 
     var body: some View {
         ModulePage(module: .developer, subtitle: "Simulators and emulators, Xcode firmware, npm and other package caches, project builds, Docker junk.") {
@@ -44,7 +54,7 @@ struct DeveloperView: View {
                             Text("No developer clutter found.").foregroundStyle(.secondary)
                         }
                     }
-                    ActionBar(selectedCount: chosen.count, selectedSize: chosenSize, buttonTitle: "Clean", busy: busy) { confirm = true }
+                    ActionBar(selectedCount: chosen.count, selectedSize: chosenSize, buttonTitle: "Clean", busy: busy) { askConfirm() }
                 }
             } else {
                 StateView(symbol: "hammer", title: "Free up space taken by developer tools",
@@ -56,7 +66,7 @@ struct DeveloperView: View {
         .confirmationDialog("Clean \(FileSize.format(chosenSize))?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: clean)
         } message: {
-            Text((removalMode == RemovalMode.trash.rawValue ? "Files and folders will be moved to the Trash." : "Files and folders will be deleted permanently.")
+            Text((inUse.map { $0 + "\n\n" } ?? "") + (removalMode == RemovalMode.trash.rawValue ? "Files and folders will be moved to the Trash." : "Files and folders will be deleted permanently.")
                  + (hasCommands ? " Simulators and runtimes are deleted at once and for good (through simctl)." : ""))
         }
         .confirmationDialog("Clean up Docker?", isPresented: $confirmDocker) {
@@ -168,7 +178,7 @@ struct DeveloperView: View {
             progress = "Simulators…"
             let sims = await AppState.background { SimulatorScanner(env: env, runner: runner).scan() }
             progress = "Project builds…"
-            let builds = await AppState.background { BuildArtifactFinder(env: env).find(roots: roots) }
+            let builds = await AppState.background { BuildArtifactFinder(env: env, runner: runner).find(roots: roots) }
             progress = "Docker…"
             self.docker = await AppState.background { docker.state() }
             let all = (folders + sims + builds).sorted { $0.size > $1.size }
