@@ -145,4 +145,6 @@ These projects were studied for ideas. No code was copied from them.
 
 ## License
 
-No license has been chosen yet, so all rights are reserved by the author. Open an issue if you would like to use the code.
+MyOpenCleaner is released under the [MIT License](LICENSE). You can use, change and share it, including in commercial projects, as long as the license notice stays with the code.
+
+MyOpenCleaner deletes files you choose. It comes with no warranty: keep backups, and look at what is selected before you clean.
