@@ -29,7 +29,7 @@
 | System junk, uninstaller, leftovers, large & old files, duplicates, similar photos, space map | Yes | Yes |
 | Malware and launch-item checks, privacy cleanup, shredder, maintenance tasks, menu bar monitor | Yes | Yes |
 | Real-time malware protection, mail unsubscribe, cloud-account cleanup | No | Yes |
-| Signed and notarized download | No (ad-hoc signed download: allow it once, or build from source) | Yes |
+| Download | Free, built in public by GitHub Actions (first launch: one click on *Open Anyway*) | Notarized by Apple |
 
 MyOpenCleaner is independent and not affiliated with MacPaw (see [Trademarks](#trademarks)).
 
