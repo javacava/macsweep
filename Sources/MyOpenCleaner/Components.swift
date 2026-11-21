@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import SweepCore
 
 /// Page frame used by every module: header with icon, title, subtitle and actions, then content.
