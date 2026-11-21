@@ -1,14 +1,35 @@
-# MyOpenCleaner
+# MyOpenCleaner — free, open-source CleanMyMac alternative for macOS
 
-A free, open-source Mac cleaner in the spirit of CleanMyMac, written in Swift and SwiftUI.
+**MyOpenCleaner is a free, open-source (MIT) Mac cleaner and optimizer written in Swift and SwiftUI.** It removes system junk, developer clutter (Xcode DerivedData, iOS simulators, `node_modules`, Docker, package caches, local AI models), uninstalls apps with all their leftovers, finds duplicates and large files, checks what starts automatically, and shows your Mac's health and battery. Nothing is removed until you choose it, and by default files go to the Trash, so a clean can be undone.
 
-MyOpenCleaner finds system junk, developer clutter, leftovers of removed apps, duplicates and large files, checks what starts automatically, and shows your Mac's health and battery. It never deletes anything you did not choose, and by default everything goes to the Trash.
+- **Free, no subscription, no account.** MIT-licensed; every feature is in the app, with no paid tier.
+- **Private.** No telemetry, no analytics. The only network request is the optional "Check for updates" of your Sparkle-based apps, and only when you press it.
+- **Native and small.** One 6 MB SwiftUI app. No Electron, no background daemon, no helper installed as root.
+- **Safe by design.** One safety guard checks every deletion; system folders, Keychains, the Photos library and your exclusions can never be removed. By default removals go to the Trash and can be put back with Undo.
+- **Built for developers too.** Cleans Xcode, simulators, Android emulators, npm/pnpm/Yarn/pip/uv/Cargo/Go/Gradle/CocoaPods caches, project build folders (git-aware), Docker, and models of Ollama, LM Studio and Hugging Face.
+- **Tested.** 250+ automated tests run against fake Macs in temporary folders, so they never touch real files.
 
-- **Native and small**: one SwiftUI app, no Electron, no background daemon, no network calls except optional update checks.
-- **Safe by design**: every deletion passes one safety guard that protects system folders and your personal data.
-- **Tested**: 250+ tests run against fake Macs in temporary folders, so they never touch your files.
+![MyOpenCleaner Quick Scan: one scan for junk, threats, app leftovers and maintenance](docs/screenshots/quick-scan.png)
 
-![Quick Scan](docs/screenshots/quick-scan.png)
+## Who it is for
+
+- **Anyone whose Mac says the disk is almost full**: one Quick Scan shows what is safe to clean, usually caches, logs, old installers and leftovers of removed apps.
+- **Developers**: Xcode, simulators, Docker, package managers and AI models are often 50–150 GB on a developer Mac. MyOpenCleaner lists them per item, with how long ago each project was touched.
+- **People who want CleanMyMac features without a subscription**, or who prefer software whose code they can read.
+- **Anyone cautious about cleaners**: MyOpenCleaner shows exactly what it will remove, explains why, and lets you undo.
+
+## MyOpenCleaner compared with CleanMyMac
+
+| | MyOpenCleaner | CleanMyMac (MacPaw) |
+|---|---|---|
+| Price | Free | Paid subscription |
+| Source code | Open (MIT) | Closed |
+| System junk, uninstaller, leftovers, large & old files, duplicates, similar photos, space map | Yes | Yes |
+| Malware and launch-item checks, privacy cleanup, shredder, maintenance tasks, menu bar monitor | Yes | Yes |
+| Real-time malware protection, mail unsubscribe, cloud-account cleanup | No | Yes |
+| Signed and notarized download | No (build from source, or allow the ad-hoc signed app once) | Yes |
+
+Also in MyOpenCleaner: in-depth developer cleanup (Xcode, simulators, Docker, package and IDE caches, git-aware project builds, local AI models), Undo for a whole clean, a warning when files are open in another program, user exclusions, and a command-line clean with dry run and JSON output.
 
 ## Requirements
 
@@ -69,6 +90,38 @@ This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./bu
 | **Duplicates** | Finds identical files by content (SHA-256). Always keeps at least one copy. |
 | **Similar Photos** | Groups bursts, retakes and resized copies with a perceptual hash. |
 | **Space Map** | A map of folder sizes you can click through. |
+
+## FAQ
+
+**Is there a free alternative to CleanMyMac?**
+Yes. MyOpenCleaner is a free, open-source alternative to CleanMyMac X / CleanMyMac for macOS 14 and later. It covers system junk, app uninstalling with leftovers, large and duplicate files, similar photos, a disk space map, malware and launch-item checks, privacy cleanup, maintenance tasks and a menu bar monitor, plus developer cleanup that CleanMyMac does not go into.
+
+**Is MyOpenCleaner safe to use?**
+It is built to be hard to misuse: scanning never changes anything, risky items start unselected, every path passes a safety guard (system folders, Keychains, `~/Documents` itself, the Photos library and your exclusions are refused), removed items go to the Trash and can be restored with Undo, and it warns when a program still has the files open. As with any cleaner, look at what is selected before you press Clean.
+
+**Does MyOpenCleaner collect data or need an internet connection?**
+No. There is no telemetry and no account. The only network request is the optional update check for installed apps that use Sparkle, and only when you press "Check".
+
+**How do I free up "System Data" or disk space on a Mac?**
+Run Quick Scan or System Junk for caches, logs and installers; Developer for Xcode, simulators and package caches; Large & Old Files and Space Map to see what is big; Mac Health shows purgeable space that macOS frees by itself, and Maintenance can thin local Time Machine snapshots.
+
+**How do I delete Xcode DerivedData, old iOS simulators and simulator runtimes?**
+Open Developer. DerivedData, device symbols and caches are listed with sizes; simulators and runtimes are removed through Apple's own `simctl`, and simulators whose runtime is gone are preselected.
+
+**How do I find and delete `node_modules`, `target`, `.build` and other build folders?**
+Developer → Builds and dependencies lists them for Node, Swift, Rust, Python, Gradle, CocoaPods, Dart, Unity, Unreal, Godot, .NET, Terraform, Zig, Elixir and Haskell projects, with days since the project changed. A folder counts only next to its project file, and inside a git repository only if nothing in it is tracked.
+
+**How do I remove downloaded Ollama, LM Studio or Hugging Face models?**
+Developer → Downloaded AI models lists each model with its size. Nothing is preselected; for Ollama, layers shared with other models are kept.
+
+**How do I completely uninstall a Mac app?**
+Uninstaller lists the app and every file it keeps in the Library folders (preferences, caches, containers, launch agents…). Remove takes everything selected; Reset keeps the app and clears its data. App Leftovers finds files of apps you already deleted.
+
+**Can I use it from the terminal or in scripts?**
+Yes: `MyOpenCleaner --clean` prints a dry run, `--yes` moves the items to the Trash, `--category` and `--json` are available. See [Command line](#command-line).
+
+**Which Macs does it run on?**
+macOS 14 Sonoma or later. Build it from source on Apple silicon or Intel.
 
 ## Screenshots
 
