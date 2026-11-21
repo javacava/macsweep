@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Free Up Space from Xcode: DerivedData, Simulators, Runtimes — MyOpenCleaner</title>
+<meta name="description" content="Xcode can take 50+ GB. What is safe to delete — DerivedData, unavailable simulators, old runtimes, iOS DeviceSupport, caches, the Metal toolchain — with the exact simctl and xcodebuild commands.">
+<link rel="canonical" href="https://javacava.github.io/myopencleaner/guides/free-up-xcode-space/">
+<link rel="icon" type="image/png" href="../../assets/favicon.png">
+<meta name="theme-color" content="#000000">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MyOpenCleaner">
+<meta property="og:title" content="How to Free Up Space from Xcode">
+<meta property="og:description" content="DerivedData, simulators, runtimes, device support and caches — what is safe to delete, with the exact commands.">
+<meta property="og:url" content="https://javacava.github.io/myopencleaner/guides/free-up-xcode-space/">
+<meta property="og:image" content="https://javacava.github.io/myopencleaner/assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../assets/article.css">
+<script type="application/ld+json">
+[{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "How to Free Up Space from Xcode: DerivedData, Simulators and Runtimes",
+  "description": "What is safe to delete from Xcode and how: DerivedData, unavailable simulators, simulator runtimes, iOS DeviceSupport, caches and the Metal toolchain.",
+  "datePublished": "2026-11-21",
+  "dateModified": "2026-11-21",
+  "author": {"@type": "Organization", "name": "MyOpenCleaner contributors", "url": "https://github.com/javacava/myopencleaner"},
+  "publisher": {"@type": "Organization", "name": "MyOpenCleaner", "logo": {"@type": "ImageObject", "url": "https://javacava.github.io/myopencleaner/assets/icon.png"}},
+  "image": "https://javacava.github.io/myopencleaner/assets/og.jpg",
+  "mainEntityOfPage": "https://javacava.github.io/myopencleaner/guides/free-up-xcode-space/",
+  "proficiencyLevel": "Expert",
+  "dependencies": "Xcode, macOS 14 or later"
+},{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "MyOpenCleaner", "item": "https://javacava.github.io/myopencleaner/"},
+    {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://javacava.github.io/myopencleaner/guides/"},
+    {"@type": "ListItem", "position": 3, "name": "Free up space from Xcode"}
+  ]
+},{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is it safe to delete Xcode DerivedData?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. DerivedData holds build products and indexes that Xcode recreates. The only cost is a longer first build and re-indexing."}},
+    {"@type": "Question", "name": "How do I delete unavailable iOS simulators?", "acceptedAnswer": {"@type": "Answer", "text": "Run xcrun simctl delete unavailable. It removes simulators whose runtime is no longer supported by the installed Xcode."}},
+    {"@type": "Question", "name": "How do I delete old simulator runtimes?", "acceptedAnswer": {"@type": "Answer", "text": "List them with xcrun simctl runtime list, then delete one by identifier with xcrun simctl runtime delete <identifier>, or preview unused ones with xcrun simctl runtime delete --notUsedSinceDays 180 --dry-run."}}
+  ]
+}]
+</script>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="../../"><img src="../../assets/icon.png" alt="">MyOpenCleaner</a>
+  <div class="nav-links"><a href="../">Guides</a><a href="../../#developers">For developers</a><a class="nav-cta" href="https://github.com/javacava/myopencleaner">Get it</a></div>
+</div></nav>
+
+<article>
+  <div class="crumbs"><a href="../../">MyOpenCleaner</a> › <a href="../">Guides</a> › Xcode</div>
+  <p class="kicker">Guide · For developers</p>
+  <h1>How to free up space from Xcode</h1>
+  <p class="intro">On a developer Mac, Xcode quietly becomes one of the biggest things on the disk. Here is every place it stores data, what is safe to delete, and the exact commands — tested on Xcode 26 and macOS 27.</p>
+  <div class="meta">Updated November 21, 2026 · 9 min read · Works with Xcode 15 and later</div>
+
+  <h2>Where Xcode keeps its data</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Location</th><th>What it is</th><th>Safe to delete?</th></tr></thead>
+    <tbody>
+      <tr><td><code>~/Library/Developer/Xcode/DerivedData</code></td><td>Build products and indexes</td><td>Yes — rebuilt on the next build</td></tr>
+      <tr><td><code>~/Library/Developer/Xcode/iOS DeviceSupport</code></td><td>Symbols copied from connected devices</td><td>Yes — copied again when a device connects</td></tr>
+      <tr><td><code>~/Library/Developer/CoreSimulator/Devices</code></td><td>Simulators and their apps and data</td><td>Per simulator, with <code>simctl</code></td></tr>
+      <tr><td>Simulator runtimes</td><td>iOS, watchOS, tvOS images for simulators</td><td>Unused ones, with <code>simctl runtime</code></td></tr>
+      <tr><td><code>~/Library/Developer/Xcode/Archives</code></td><td>Archived app builds with dSYMs</td><td>Only builds you will never need to symbolicate</td></tr>
+      <tr><td><code>~/Library/Caches/com.apple.dt.Xcode</code></td><td>Xcode's own cache</td><td>Yes, with Xcode closed</td></tr>
+      <tr><td><code>~/Library/Developer/CoreSimulator/Caches</code></td><td>Simulator caches</td><td>Yes</td></tr>
+      <tr><td><code>~/Library/Caches/org.swift.swiftpm</code></td><td>Swift Package Manager downloads</td><td>Yes — packages are fetched again</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>1. DerivedData</h2>
+  <p>DerivedData holds intermediate build files and indexes for every project you have opened. It is completely safe to delete; Xcode recreates it, and the only cost is a longer first build.</p>
+<pre><code># everything
+rm -rf ~/Library/Developer/Xcode/DerivedData/*
+
+# or one project: find its folder first
+ls ~/Library/Developer/Xcode/DerivedData</code></pre>
+  <p>Quit Xcode first. You can also open <strong>Xcode → Settings → Locations</strong> and click the arrow next to the DerivedData path to see it in Finder.</p>
+
+  <h2>2. Simulators you do not use</h2>
+  <p>Each simulator keeps its own copy of installed apps and their data. Simulators for runtimes you no longer have cannot even start. Delete those first:</p>
+<pre><code>xcrun simctl delete unavailable</code></pre>
+  <p>To see every simulator and remove a specific one:</p>
+<pre><code>xcrun simctl list devices
+xcrun simctl delete &lt;UDID&gt;</code></pre>
+
+  <h2>3. Old simulator runtimes</h2>
+  <p>Runtimes are the biggest single items — each iOS runtime is several gigabytes. List what is installed:</p>
+<pre><code>xcrun simctl runtime list</code></pre>
+  <p>Preview the runtimes you have not used in six months, then delete them:</p>
+<pre><code>xcrun simctl runtime delete --notUsedSinceDays 180 --dry-run
+xcrun simctl runtime delete --notUsedSinceDays 180</code></pre>
+  <p>Or remove one by its identifier from the list: <code>xcrun simctl runtime delete &lt;identifier&gt;</code>. You can download any runtime again in <strong>Xcode → Settings → Components</strong>.</p>
+
+  <h2>4. iOS DeviceSupport</h2>
+  <p>Every time you connect a device running a new iOS version, Xcode copies its symbols into <code>~/Library/Developer/Xcode/iOS DeviceSupport</code> (and watchOS/tvOS equivalents). Folders for versions none of your devices run any more can go.</p>
+
+  <h2>5. Archives — keep the ones you shipped</h2>
+  <p>Archives include the dSYM files you need to symbolicate crash reports for released builds. Delete old archives only for builds that are no longer in users' hands, or after you have uploaded the dSYMs elsewhere.</p>
+
+  <h2>6. The Metal toolchain</h2>
+  <p>Recent Xcode versions download the Metal toolchain as a separate component. If you do not compile Metal shaders, check whether it is installed and remove it:</p>
+<pre><code>xcodebuild -showComponent metaltoolchain
+xcodebuild -deleteComponent metaltoolchain</code></pre>
+
+  <h2>7. Everything else around Xcode</h2>
+  <p>A developer Mac usually has more: <code>node_modules</code> folders, Docker images and build cache, npm/pnpm/Yarn/pip/Cargo/Gradle/CocoaPods caches, Android emulators, and local AI models. These are often as large as Xcode itself.</p>
+
+  <h2>The faster way: MyOpenCleaner's Developer page</h2>
+  <p><a href="../../">MyOpenCleaner</a> is a free, open-source Mac cleaner that lists all of this per item, with sizes and last-used dates, so you choose what goes:</p>
+  <ul>
+    <li>Simulators and runtimes are removed through Apple's own <code>simctl</code>; simulators whose runtime is gone are preselected, runtimes never are.</li>
+    <li>DerivedData, DeviceSupport, archives, Xcode and SwiftPM caches, XCTest devices and the Metal toolchain.</li>
+    <li>Project build folders (<code>node_modules</code>, <code>.build</code>, <code>target</code>, <code>Pods</code>…) only next to their project file, and inside a git repository only if nothing in them is tracked.</li>
+    <li>Docker prune, package manager and IDE caches, and downloaded AI models.</li>
+    <li>Files go to the Trash first, and Undo restores a whole clean.</li>
+  </ul>
+  <figure>
+    <img loading="lazy" src="../../assets/shots/developer.jpg" width="1600" height="1123" alt="MyOpenCleaner Developer page listing iOS simulators, runtimes, Xcode caches, AI models and project builds with sizes">
+    <figcaption>The Developer page groups simulators, runtimes, caches, models and builds with their sizes.</figcaption>
+  </figure>
+
+  <h2>FAQ</h2>
+  <h3>Is it safe to delete Xcode DerivedData?</h3>
+  <p>Yes. It holds build products and indexes that Xcode recreates. The only cost is a longer first build and re-indexing.</p>
+  <h3>How do I delete unavailable iOS simulators?</h3>
+  <p>Run <code>xcrun simctl delete unavailable</code>. It removes simulators whose runtime is no longer supported by the installed Xcode.</p>
+  <h3>How do I delete old simulator runtimes?</h3>
+  <p>List them with <code>xcrun simctl runtime list</code>, then delete one with <code>xcrun simctl runtime delete &lt;identifier&gt;</code>, or preview unused ones with <code>xcrun simctl runtime delete --notUsedSinceDays 180 --dry-run</code>.</p>
+
+  <div class="cta">
+    <h2>See every gigabyte Xcode is holding</h2>
+    <p>Free and open source. Per-item sizes, safe defaults, and Undo for every clean.</p>
+    <a class="btn" href="https://github.com/javacava/myopencleaner">Get MyOpenCleaner</a>
+  </div>
+
+  <div class="related">
+    <h2>Related guides</h2>
+    <ul>
+      <li><a href="../clear-system-data-mac/">How to clear System Data on a Mac — safely</a></li>
+      <li><a href="../free-cleanmymac-alternatives/">Free, open-source CleanMyMac alternatives</a></li>
+    </ul>
+  </div>
+</article>
+
+<footer>
+  <p>MyOpenCleaner is free software under the MIT License. It is not affiliated with Apple. Mac, macOS, Xcode and Metal are trademarks of Apple Inc. <a href="../../">Home</a> · <a href="../">All guides</a> · <a href="https://github.com/javacava/myopencleaner">GitHub</a></p>
+</footer>
+</body>
+</html>

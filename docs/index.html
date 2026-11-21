@@ -3,17 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MyOpenCleaner — free, open-source Mac cleaner</title>
-<meta name="description" content="MyOpenCleaner is a free, open-source Mac cleaner and CleanMyMac alternative for macOS 14+. Clean system junk, Xcode and developer caches, uninstall apps with their leftovers, find duplicates. Undo for every clean, no telemetry, MIT license.">
+<title>MyOpenCleaner — Free Open-Source Mac Cleaner & CleanMyMac Alternative</title>
+<meta name="description" content="Free, open-source Mac cleaner for macOS 14+. Clear System Data and junk, Xcode and developer caches, uninstall apps with leftovers, find duplicates. Undo, no telemetry.">
+<meta name="keywords" content="mac cleaner, free mac cleaner, open source mac cleaner, cleanmymac alternative, clear system data mac, uninstall apps mac, xcode deriveddata, free up space mac">
 <meta name="theme-color" content="#000000">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/icon.png">
 <link rel="canonical" href="https://javacava.github.io/myopencleaner/">
+<link rel="sitemap" type="application/xml" href="sitemap.xml">
 <meta property="og:type" content="website">
 <meta property="og:title" content="MyOpenCleaner — space, reclaimed.">
 <meta property="og:description" content="The free, open-source Mac cleaner. Junk, developer clutter and forgotten apps, gone. Every clean can be undone.">
 <meta property="og:url" content="https://javacava.github.io/myopencleaner/">
-<meta property="og:image" content="https://javacava.github.io/myopencleaner/assets/shots/quick-scan.png">
+<meta property="og:image" content="https://javacava.github.io/myopencleaner/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MyOpenCleaner, the free open-source Mac cleaner">
+<meta property="og:site_name" content="MyOpenCleaner">
+<meta name="twitter:title" content="MyOpenCleaner — space, reclaimed.">
+<meta name="twitter:description" content="The free, open-source Mac cleaner. Junk, developer clutter and forgotten apps, gone. Every clean can be undone.">
+<meta name="twitter:image" content="https://javacava.github.io/myopencleaner/assets/og.jpg">
+<link rel="preload" as="image" href="assets/shots/quick-scan.jpg" fetchpriority="high">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 {
@@ -28,7 +38,23 @@
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "codeRepository": "https://github.com/javacava/myopencleaner",
   "url": "https://javacava.github.io/myopencleaner/",
-  "image": "https://javacava.github.io/myopencleaner/assets/icon.png"
+  "image": "https://javacava.github.io/myopencleaner/assets/icon.png",
+  "screenshot": "https://javacava.github.io/myopencleaner/assets/shots/quick-scan.jpg",
+  "softwareVersion": "1.0",
+  "featureList": "System junk cleanup, Xcode and developer cache cleanup, app uninstaller with leftovers, duplicate finder, similar photos, disk space map, malware and launch item checks, privacy cleanup, file shredder, maintenance tasks, undo for every clean, command-line clean"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is there a free alternative to CleanMyMac?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. MyOpenCleaner is a free, open-source Mac cleaner for macOS 14 and later. It covers system junk, app uninstalling with leftovers, large and duplicate files, similar photos, a disk space map, malware and launch-item checks, privacy cleanup, maintenance and a menu bar monitor, plus in-depth developer cleanup."}},
+    {"@type": "Question", "name": "Is MyOpenCleaner safe?", "acceptedAnswer": {"@type": "Answer", "text": "Scanning never changes anything. Risky items start unselected, every path passes a safety guard, removed files go to the Trash and can be restored with Undo, and you are warned when a program still has files open."}},
+    {"@type": "Question", "name": "Does MyOpenCleaner collect any data?", "acceptedAnswer": {"@type": "Answer", "text": "No. There is no telemetry and no account. The only network request is the optional update check for installed apps that use Sparkle, and only when you press Check."}},
+    {"@type": "Question", "name": "How do I free up disk space or System Data on a Mac?", "acceptedAnswer": {"@type": "Answer", "text": "Run Quick Scan or System Junk for caches, logs and installers; Developer for Xcode, simulators and package caches; Large & Old Files and Space Map to see what is big. Mac Health shows purgeable space, and Maintenance can thin local Time Machine snapshots."}},
+    {"@type": "Question", "name": "How do I delete Xcode DerivedData and old simulators?", "acceptedAnswer": {"@type": "Answer", "text": "Open Developer. DerivedData, device symbols and caches are listed with sizes; simulators and runtimes are removed through Apple's simctl, and simulators whose runtime is gone are preselected."}}
+  ]
 }
 </script>
 <style>
@@ -90,7 +116,8 @@
   .center { text-align: center; }
   .eyebrow { font-size: 21px; font-weight: 600; color: var(--soft); margin: 0 0 8px; letter-spacing: 0.01em; }
   h1, h2, h3 { margin: 0; letter-spacing: -0.025em; font-weight: 700; }
-  h1 { font-size: clamp(56px, 11vw, 128px); line-height: 1.0; }
+  .display { font-size: clamp(56px, 11vw, 128px); line-height: 1.0; font-weight: 700; letter-spacing: -0.025em; margin: 0; }
+  h1.eyebrow { font-size: 21px; font-weight: 600; letter-spacing: 0.01em; }
   h2 { font-size: clamp(40px, 6.5vw, 80px); line-height: 1.04; }
   h3 { font-size: clamp(24px, 3vw, 32px); line-height: 1.12; }
   .lead { font-size: clamp(19px, 2.2vw, 24px); color: var(--soft); max-width: 760px; margin: 22px auto 0; font-weight: 500; line-height: 1.35; }
@@ -268,6 +295,7 @@
       <a href="#safety">Safety</a>
       <a href="#compare">Compare</a>
       <a href="#faq">FAQ</a>
+      <a href="guides/">Guides</a>
       <a class="nav-cta" href="https://github.com/javacava/myopencleaner">Get it</a>
     </div>
   </div>
@@ -279,16 +307,16 @@
     <div class="planet" aria-hidden="true"></div>
     <div class="wrap">
       <div class="reveal"><span class="badge">Free &amp; open source · <b>MIT</b> · macOS 14+</span></div>
-      <p class="eyebrow reveal">MyOpenCleaner</p>
-      <h1 class="reveal"><span class="chrome">Space,</span><br><span class="grad">reclaimed.</span></h1>
-      <p class="lead reveal">The free, open-source Mac cleaner. Junk, developer clutter and forgotten apps — gone. And everything you remove can come back.</p>
+      <h1 class="eyebrow reveal">MyOpenCleaner — the free, open-source Mac cleaner</h1>
+      <p class="display reveal" aria-hidden="true"><span class="chrome">Space,</span><br><span class="grad">reclaimed.</span></p>
+      <p class="lead reveal">Clear System Data, junk, Xcode and developer clutter, and forgotten apps — free and open source. And everything you remove can come back.</p>
       <div class="buttons reveal">
         <a class="btn btn-primary" href="https://github.com/javacava/myopencleaner">Get it on GitHub</a>
         <a class="btn btn-ghost" href="#features">See what it does ›</a>
       </div>
       <div class="shot-frame tilt reveal" id="heroShot">
         <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
-        <img src="assets/shots/quick-scan.png" width="1600" height="1123" alt="MyOpenCleaner Quick Scan: junk to remove, items to review, maintenance tasks and leftovers of removed apps">
+        <img src="assets/shots/quick-scan.jpg" width="1600" height="1123" alt="MyOpenCleaner Quick Scan: junk to remove, items to review, maintenance tasks and leftovers of removed apps">
       </div>
     </div>
   </section>
@@ -319,7 +347,7 @@
             <h3>Gigabytes you never asked for.</h3>
             <p>Caches, logs, browser data, app container caches, old installers, Mail attachments, incomplete downloads — sorted by size, each with a reason.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/junk.png" width="1600" height="1123" alt="System Junk page with categories and sizes"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/junk.jpg" width="1600" height="1123" alt="System Junk page with categories and sizes"></div>
         </article>
 
         <article class="tile reveal">
@@ -328,7 +356,7 @@
             <h3>Remove an app. All of it.</h3>
             <p>Preferences, caches, containers, launch agents — every trace in the Library. Or reset an app to fresh.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/uninstaller.png" width="1600" height="1123" alt="Uninstaller showing an app and its related files"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/uninstaller.jpg" width="1600" height="1123" alt="Uninstaller showing an app and its related files"></div>
         </article>
 
         <article class="tile reveal">
@@ -337,7 +365,7 @@
             <h3>See where your space went.</h3>
             <p>Folders as planets, sized by what they hold. Click to fly inside.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/space-map.png" width="1600" height="1123" alt="Space Map showing folders as bubbles sized by disk usage"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/space-map.jpg" width="1600" height="1123" alt="Space Map showing folders as bubbles sized by disk usage"></div>
         </article>
 
         <article class="tile reveal">
@@ -346,7 +374,7 @@
             <h3>Know what starts by itself.</h3>
             <p>Adware signatures, suspicious agents, cron jobs, browser extensions, plug-ins — plus FileVault, SIP, Gatekeeper and firewall at a glance.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/malware.png" width="1600" height="1123" alt="Malware page with system protection status and launch items"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/malware.jpg" width="1600" height="1123" alt="Malware page with system protection status and launch items"></div>
         </article>
 
         <article class="tile reveal">
@@ -355,7 +383,7 @@
             <h3>Twins, found. Bit for bit.</h3>
             <p>Identical files by SHA-256, near-identical photos by a perceptual hash. Nothing preselected; one copy always stays.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/similar.png" width="1600" height="1123" alt="Similar photos grouped together"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/similar.jpg" width="1600" height="1123" alt="Similar photos grouped together"></div>
         </article>
 
         <article class="tile wide reveal">
@@ -364,7 +392,7 @@
             <h3>Live telemetry. From your Mac, to you only.</h3>
             <p>CPU, memory pressure, disk and purgeable space, network and the heaviest apps — plus a clean history where any clean can be undone.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/monitor.png" width="1600" height="1123" alt="Mac Health page with CPU, memory and disk gauges and clean history"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/monitor.jpg" width="1600" height="1123" alt="Mac Health page with CPU, memory and disk gauges and clean history"></div>
         </article>
 
         <article class="tile reveal">
@@ -373,7 +401,7 @@
             <h3>Leave no trace.</h3>
             <p>Browser history, cookies, autofill and recent items — never passwords. Shred files beyond the Trash.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/privacy.png" width="1600" height="1123" alt="Privacy page with browser traces and saved Wi-Fi networks"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/privacy.jpg" width="1600" height="1123" alt="Privacy page with browser traces and saved Wi-Fi networks"></div>
         </article>
 
         <article class="tile reveal">
@@ -382,7 +410,7 @@
             <h3>Health you can read.</h3>
             <p>Capacity, cycles, temperature and charging power for your Mac — and for an iPhone or iPad on a cable.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/battery.png" width="1600" height="1123" alt="Battery health page"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/battery.jpg" width="1600" height="1123" alt="Battery health page"></div>
         </article>
       </div>
     </div>
@@ -439,7 +467,7 @@
             <h3>Git-aware. Model-aware. Careful.</h3>
             <p>Build folders count only next to their project file, and inside a git repo only if nothing in them is tracked. Ollama layers shared by other models stay. Simulators go through Apple's own <code style="font-family:var(--mono)">simctl</code>.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/developer.png" width="1600" height="1123" alt="Developer page listing simulators, runtimes, caches, AI models and project builds"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/developer.jpg" width="1600" height="1123" alt="Developer page listing simulators, runtimes, caches, AI models and project builds"></div>
         </article>
       </div>
     </div>
@@ -533,6 +561,19 @@ Trash: 209.7 MB (2)
     </div>
   </section>
 
+  <!-- ================= GUIDES ================= -->
+  <section id="guides" class="center" style="padding-bottom:40px">
+    <div class="wrap">
+      <p class="eyebrow reveal">Guides</p>
+      <h2 class="reveal">Learn your <span class="grad">Mac.</span></h2>
+      <div class="install-steps">
+        <a class="step reveal" href="guides/clear-system-data-mac/" style="color:inherit"><div class="n">Guide</div><h4>How to clear System Data on a Mac</h4><p>What “System Data” really is, what is safe to delete, and how to do it by hand or in one scan.</p></a>
+        <a class="step reveal" href="guides/free-up-xcode-space/" style="color:inherit"><div class="n">Guide</div><h4>Free up space from Xcode</h4><p>DerivedData, simulators, runtimes, device support and caches — with the exact commands.</p></a>
+        <a class="step reveal" href="guides/free-cleanmymac-alternatives/" style="color:inherit"><div class="n">Guide</div><h4>Free, open-source CleanMyMac alternatives</h4><p>An honest comparison of the open-source Mac cleaners worth knowing in 2026.</p></a>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= INSTALL ================= -->
   <section id="install" class="center install">
     <div class="wrap">
@@ -562,6 +603,7 @@ Trash: 209.7 MB (2)
   <div class="wrap">
     <div>MyOpenCleaner is free software under the <a href="https://github.com/javacava/myopencleaner/blob/main/LICENSE">MIT License</a>. Screenshots show a made-up demo Mac.</div>
     <div>CleanMyMac is a trademark of MacPaw. MyOpenCleaner is an independent open-source project and is not affiliated with, endorsed by or sponsored by MacPaw or Apple. Mac and macOS are trademarks of Apple Inc., registered in the U.S. and other countries.</div>
+    <div class="row"><span>Guides: <a href="guides/clear-system-data-mac/">Clear System Data</a> · <a href="guides/free-up-xcode-space/">Free up Xcode space</a> · <a href="guides/free-cleanmymac-alternatives/">CleanMyMac alternatives</a></span></div>
     <div class="row"><span>Made with care, among the stars.</span><a href="https://github.com/javacava/myopencleaner">github.com/javacava/myopencleaner</a></div>
   </div>
 </footer>
