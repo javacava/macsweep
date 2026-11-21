@@ -60,9 +60,9 @@ struct MaintenanceView: View {
 
     func run() {
         busy = true
-        let chosen = tasks.filter { selected.contains($0.id) }
+        let chosen = tasks.filter { selected.contains($0.id) }, runner = state.runner
         Task {
-            let r = await AppState.background { MaintenanceRunner().run(chosen) }
+            let r = await AppState.background { MaintenanceRunner(runner: runner).run(chosen) }
             results = r
             state.activity.markMaintenance(r.filter { $0.value.ok }.map(\.key))
             state.activityVersion += 1
@@ -124,10 +124,10 @@ struct LaunchItemsView: View {
 
     func load() {
         loading = true
-        let env = state.env
+        let env = state.env, runner = state.runner
         Task {
             let (i, d) = await AppState.background { () -> ([LaunchItem], Set<String>) in
-                let m = LaunchItemsManager(env: env)
+                let m = LaunchItemsManager(env: env, runner: runner)
                 return (m.items(), m.disabledLabels())
             }
             items = i; disabled = d; loading = false
@@ -135,9 +135,9 @@ struct LaunchItemsView: View {
     }
 
     func toggle(_ item: LaunchItem, _ on: Bool) {
-        let env = state.env
+        let env = state.env, runner = state.runner
         Task {
-            let r = await AppState.background { LaunchItemsManager(env: env).setEnabled(item, on) }
+            let r = await AppState.background { LaunchItemsManager(env: env, runner: runner).setEnabled(item, on) }
             if !r.ok { message = r.error.isEmpty ? "launchctl exited with code \(r.status)" : r.error }
             load()
         }

@@ -49,6 +49,7 @@ struct MalwareView: View {
                           busy: busy, buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, threats == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) items?", isPresented: $confirm) {
             Button("Stop and remove", role: .destructive, action: remove)
         } message: { Text("The processes are stopped and their launch files removed. System items need a password.") }
@@ -59,9 +60,9 @@ struct MalwareView: View {
 
     func scan() {
         busy = true; threats = nil
-        let env = state.env
+        let env = state.env, runner = state.runner
         Task {
-            let t = await AppState.background { MalwareScanner(env: env).scan(LaunchItemsManager(env: env).items()) }
+            let t = await AppState.background { MalwareScanner(env: env).scan(LaunchItemsManager(env: env, runner: runner).items()) }
             threats = t
             selected = Set(t.filter { $0.level == .known }.map(\.id))
             busy = false
@@ -70,10 +71,10 @@ struct MalwareView: View {
 
     func remove() {
         busy = true
-        let env = state.env, items = chosen, cleaner = state.cleaner()
+        let env = state.env, items = chosen, cleaner = state.cleaner(), runner = state.runner
         Task {
             let r = await AppState.background { () -> CleanReport in
-                let m = LaunchItemsManager(env: env)
+                let m = LaunchItemsManager(env: env, runner: runner)
                 let user = items.filter { $0.item.scope == .userAgent }
                 for t in user { m.setEnabled(t.item, false) }
                 var report = cleaner.remove(user.flatMap(\.files).map { ($0, FileSize.of($0)) })
@@ -93,7 +94,7 @@ struct MalwareView: View {
                     if !allowed.isEmpty {
                         lines.append("/bin/rm -f -- " + allowed.map { AdminScript.shellQuote($0.path) }.joined(separator: " "))
                     }
-                    _ = ProcessRunner().runAsAdmin(lines.joined(separator: "; "))
+                    _ = runner.runAsAdmin(lines.joined(separator: "; "))
                     // Trust the disk, not the exit code: bootout fails harmlessly when the item was not loaded.
                     for f in allowed {
                         if FileManager.default.fileExists(atPath: f.path) { report.failed.append((f, "Cancelled or not permitted")) }
@@ -166,6 +167,7 @@ struct PrivacyView: View {
                           busy: busy, buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, items == nil, !busy { scan() } }
         .confirmationDialog("Clear the selection?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: clean)
         } message: { Text("Quit browsers before clearing. Removing cookies signs you out of websites.") }
@@ -176,11 +178,11 @@ struct PrivacyView: View {
 
     func scan() {
         busy = true; items = nil
-        let env = state.env
+        let env = state.env, runner = state.runner
         Task {
             let (found, s, w) = await AppState.background { () -> ([PrivacyItem], [String: Int64], [String]) in
                 let f = PrivacyScanner(env: env).scan()
-                return (f, Dictionary(uniqueKeysWithValues: f.map { ($0.id, $0.size) }), WiFiNetworks().list())
+                return (f, Dictionary(uniqueKeysWithValues: f.map { ($0.id, $0.size) }), WiFiNetworks(runner: runner).list())
             }
             items = found; sizes = s; wifi = w; selected = []; busy = false
         }
@@ -206,7 +208,8 @@ struct PrivacyView: View {
 
     func forget(_ ssid: String) {
         Task {
-            let r = await AppState.background { WiFiNetworks().remove(ssid) }
+            let runner = state.runner
+            let r = await AppState.background { WiFiNetworks(runner: runner).remove(ssid) }
             if r.ok { wifi.removeAll { $0 == ssid } } else { message = "Failed: \(r.error)" }
         }
     }

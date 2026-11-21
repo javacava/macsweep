@@ -44,7 +44,7 @@ struct ShredderView: View {
                     List {
                         ForEach(queue.items, id: \.path) { url in
                             HStack(spacing: 10) {
-                                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 24, height: 24)
+                                FileIcon(url: url).frame(width: 24, height: 24)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(url.lastPathComponent).lineLimit(1).truncationMode(.middle)
                                     Text(state.display(url.deletingLastPathComponent())).font(.caption).foregroundStyle(.secondary)

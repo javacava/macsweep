@@ -58,6 +58,7 @@ struct UninstallerView: View {
             }
         }
         .onAppear { store.load() }
+        .onChange(of: store.apps) { if AppState.shared.autoScan, picked == nil, let a = store.apps.first(where: { $0.name == "PixelPaint" }) { pick(a) } }
         .confirmationDialog(removeApp ? "Remove \(picked?.name ?? "")?" : "Reset \(picked?.name ?? "")?", isPresented: $confirm) {
             Button(removeApp ? "Remove" : "Reset", role: .destructive, action: uninstall)
         } message: {
@@ -179,6 +180,7 @@ struct LeftoversView: View {
                           busy: busy, buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, items == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) items?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: clean)
         }
@@ -189,12 +191,12 @@ struct LeftoversView: View {
 
     func scan() {
         busy = true; items = nil
-        let env = state.env
+        let env = state.env, runner = state.runner
         Task {
             let r = await AppState.background {
                 // Spotlight knows apps outside /Applications too (other folders, external disks).
                 LeftoverFinder(env: env).orphans(installed: AppScanner.installedApps(env: env),
-                                                 extraBundleIDs: AppScanner.spotlightBundleIDs())
+                                                 extraBundleIDs: AppScanner.spotlightBundleIDs(runner: runner))
             }
             items = r; selected = []; busy = false
         }

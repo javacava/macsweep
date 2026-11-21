@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import SweepCore
 
 // `MyOpenCleaner --scan` prints what the junk scanner finds and exits (nothing is deleted).
@@ -40,6 +41,10 @@ Prefs.registerDefaults()
 // `MyOpenCleaner --snapshot <dir>` renders every module page to PNG (for checking the UI without a screen grab).
 if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
     let dir = URL(fileURLWithPath: CommandLine.arguments[i + 1])
+    // `--demo` renders a made-up Mac instead of this one: use it for anything you publish.
+    if CommandLine.arguments.contains("--demo") {
+        do { Demo.active = try DemoMac() } catch { print("Could not build the demo Mac: \(error)"); exit(1) }
+    }
     MainActor.assumeIsolated { Snapshotter.run(into: dir) }
 }
 
@@ -51,19 +56,54 @@ enum Snapshotter {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        if let demo = Demo.active { ShredderQueue.shared.add(demo.shredderQueue) }
+        let wait: Double = Demo.active == nil ? 1.2 : 5
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
                               styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: .aqua)
         window.contentView = NSHostingView(rootView: RootView().frame(width: 1100, height: 720))
         window.orderFrontRegardless()
+
+        func capture(_ view: NSView, _ name: String) {
+            guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            // Flatten onto an opaque background: translucent sidebar pixels look washed out on dark pages.
+            guard let image = rep.cgImage,
+                  let ctx = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return }
+            ctx.setFillColor(CGColor(srgbRed: 0.93, green: 0.93, blue: 0.94, alpha: 1))   // light sidebar grey
+            ctx.fill(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            guard let flat = ctx.makeImage(),
+                  let dest = CGImageDestinationCreateWithURL(dir.appendingPathComponent(name + ".png") as CFURL,
+                                                             UTType.png.identifier as CFString, 1, nil) else { return }
+            CGImageDestinationAddImage(dest, flat, nil)
+            CGImageDestinationFinalize(dest)
+        }
+
+        func finish() {
+            // The menu bar panel, drawn on its own.
+            let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 420),
+                                 styleMask: [.borderless], backing: .buffered, defer: false)
+            panel.appearance = NSAppearance(named: .aqua)
+            let host = NSHostingView(rootView: MenuPanel().background(Color(nsColor: .windowBackgroundColor)))
+            panel.contentView = host
+            panel.setContentSize(host.fittingSize)
+            panel.orderFrontRegardless()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                capture(host, "menubar")
+                Demo.active?.remove()
+                exit(0)
+            }
+        }
+
         var modules = Module.allCases.makeIterator()
         func next() {
-            guard let m = modules.next() else { exit(0) }
+            guard let m = modules.next() else { finish(); return }
             AppState.shared.selection = m
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                guard let view = window.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
-                view.cacheDisplay(in: view.bounds, to: rep)
-                try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("\(m.rawValue).png"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
+                if let view = window.contentView { capture(view, m.rawValue) }
                 next()
             }
         }

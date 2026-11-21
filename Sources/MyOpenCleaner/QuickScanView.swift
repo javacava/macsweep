@@ -57,6 +57,7 @@ struct QuickScanView: View {
             }
             .frame(maxWidth: .infinity)
         }
+        .onAppear { if AppState.shared.autoScan, report == nil, done == nil, !busy { scan() } }
         .confirmationDialog("Clean \(FileSize.format(report?.reclaimable ?? 0))?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: run)
         } message: {
@@ -93,10 +94,10 @@ struct QuickScanView: View {
 
     func scan() {
         busy = true; done = nil; report = nil
-        let env = state.env, last = state.activity.state.lastMaintenance
+        let env = state.env, last = state.activity.state.lastMaintenance, runner = state.runner
         Task {
             let r = await AppState.background {
-                QuickScan(env: env).scan(lastMaintenance: last) { msg in
+                QuickScan(env: env, runner: runner).scan(lastMaintenance: last) { msg in
                     Task { @MainActor in progress = msg }
                 }
             }
@@ -107,9 +108,9 @@ struct QuickScanView: View {
     func run() {
         guard let report else { return }
         busy = true; progress = "Cleaning…"
-        let env = state.env, mode = state.removalMode
+        let env = state.env, mode = state.removalMode, runner = state.runner
         Task {
-            let r = await AppState.background { QuickScan(env: env).run(report, mode: mode) }
+            let r = await AppState.background { QuickScan(env: env, runner: runner).run(report, mode: mode) }
             state.record(.quickScan, r.cleaned)
             state.activity.markMaintenance(r.tasksRun.filter { $0.value.ok }.map(\.key))
             done = r; busy = false

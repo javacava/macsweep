@@ -38,6 +38,7 @@ struct JunkView: View {
                           buttonTitle: "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, result == nil, !busy { scan() } }
         .confirmationDialog("Clean \(FileSize.format(selectedItems.reduce(0) { $0 + $1.size }))?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: clean)
         } message: {

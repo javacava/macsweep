@@ -25,7 +25,12 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var devices: [HistoryDevice] = []
     private let url: URL
 
-    init() {
+    init(url fixedURL: URL? = nil) {
+        if let fixedURL {
+            url = fixedURL
+            load()
+            return
+        }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let base = support.appendingPathComponent("MyOpenCleaner", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)

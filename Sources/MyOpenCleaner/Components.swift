@@ -77,8 +77,7 @@ struct FileRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.checkbox)
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                .resizable().frame(width: 22, height: 22)
+            FileIcon(url: url).frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title ?? url.lastPathComponent).lineLimit(1).truncationMode(.middle)
                 Text(detail ?? AppState.shared.display(url.deletingLastPathComponent()))
@@ -90,6 +89,34 @@ struct FileRow: View {
                 .buttonStyle(.borderless).help("Show in Finder")
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// The Finder icon of a file. In demo mode a neutral symbol instead, because Finder icons reveal
+/// which apps are installed on the Mac that renders the screenshot.
+struct FileIcon: View {
+    let url: URL
+
+    var body: some View {
+        if Demo.active == nil || url.pathExtension == "app" {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable()
+        } else {
+            Image(systemName: Self.symbol(url)).resizable().scaledToFit().padding(2).foregroundStyle(.secondary)
+        }
+    }
+
+    static func symbol(_ url: URL) -> String {
+        if url.isDirectoryURL { return "folder.fill" }
+        switch FileKind.of(url) {
+        case .video: return "film"
+        case .audio: return "waveform"
+        case .image: return "photo"
+        case .archive: return "doc.zipper"
+        case .diskImage: return "opticaldiscdrive"
+        case .document: return "doc.richtext"
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        case .other: return "doc"
+        }
     }
 }
 

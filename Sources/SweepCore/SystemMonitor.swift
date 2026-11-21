@@ -25,6 +25,12 @@ public struct MemoryStats: Equatable, Sendable {
     public var purgeable: UInt64
     public var external: UInt64
 
+    public init(total: UInt64, free: UInt64, active: UInt64, inactive: UInt64, wired: UInt64,
+                compressed: UInt64, purgeable: UInt64, external: UInt64) {
+        self.total = total; self.free = free; self.active = active; self.inactive = inactive
+        self.wired = wired; self.compressed = compressed; self.purgeable = purgeable; self.external = external
+    }
+
     /// "App memory + wired + compressed", like Activity Monitor's "Memory Used".
     public var used: UInt64 {
         let app = active + inactive > purgeable + external ? active + inactive - purgeable - external : 0
@@ -48,6 +54,8 @@ public struct MemoryStats: Equatable, Sendable {
 public struct DiskStats: Equatable, Sendable {
     public var total: Int64
     public var available: Int64
+
+    public init(total: Int64, available: Int64) { self.total = total; self.available = available }
     public var used: Int64 { total - available }
     public var usedFraction: Double { total > 0 ? Double(used) / Double(total) : 0 }
 }

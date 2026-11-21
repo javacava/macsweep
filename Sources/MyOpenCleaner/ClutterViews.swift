@@ -49,6 +49,7 @@ struct LargeOldView: View {
                           busy: busy, buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, files == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) files?", isPresented: $confirm) {
             Button("Remove", role: .destructive) { remove(chosen.map { ($0.url, $0.size) }) }
         }
@@ -132,6 +133,7 @@ struct DuplicatesView: View {
                           buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, groups == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) copies?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
         }
@@ -220,6 +222,7 @@ struct SimilarView: View {
                           buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, groups == nil, !busy { scan() } }
         .confirmationDialog("Remove \(chosen.count) photos?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
         }
@@ -327,6 +330,7 @@ struct SpaceMapView: View {
                           buttonTitle: "Scan home folder") { load(state.env.home, reset: true) }
             }
         }
+        .onAppear { if AppState.shared.autoScan, stack.isEmpty, !busy { load(state.env.home, reset: true) } }
         .confirmationDialog("Remove \"\(confirmNode?.name ?? "")\"?", isPresented: Binding(get: { confirmNode != nil }, set: { if !$0 { confirmNode = nil } })) {
             Button("Remove", role: .destructive) {
                 guard let n = confirmNode else { return }
@@ -427,6 +431,7 @@ struct CloudView: View {
                           busy: busy, buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, files == nil, !busy { scan() } }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }

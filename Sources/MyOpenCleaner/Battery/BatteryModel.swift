@@ -30,8 +30,8 @@ final class BatteryModel: ObservableObject {
     @Published var samples: [String: [Sample]] = [:]
     @Published var iosScanning = false
 
-    let macSystem = MacBatteryReader.systemInfo()
-    let history = HistoryStore()
+    let macSystem = Demo.active?.system ?? MacBatteryReader.systemInfo()
+    let history = Demo.active.map { HistoryStore(url: $0.historyURL) } ?? HistoryStore()
 
     private let iosReader = IOSDeviceReader()
     private let iosQueue = DispatchQueue(label: "myopencleaner.battery.ios")
@@ -46,6 +46,16 @@ final class BatteryModel: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        if let demo = Demo.active {
+            // Screenshot mode: a fixed, made-up battery and no device polling.
+            macBattery = demo.battery
+            if let b = macBattery {
+                samples[macID] = (0..<40).map { i in
+                    Sample(date: Date().addingTimeInterval(Double(i - 40) * 30), watts: 38 + 6 * sin(Double(i) / 4), percent: b.percent)
+                }
+            }
+            return
+        }
         refreshMac()
         refreshIOS()
         scheduleTimers()

@@ -80,8 +80,30 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    let env = SweepEnvironment.live
-    let activity = ActivityLog(fileURL: ActivityLog.defaultURL)
+    let env: SweepEnvironment
+    let activity: ActivityLog
+    /// Every external tool the pages call goes through this; the demo Mac swaps in canned answers.
+    let runner: CommandRunning
+    /// Pages scan as soon as they appear (screenshot mode only).
+    let autoScan: Bool
+
+    private init() {
+        if let demo = Demo.active {
+            env = demo.env
+            activity = ActivityLog(fileURL: demo.activityURL)
+            runner = demo.runner
+            autoScan = true
+        } else {
+            env = .live
+            activity = ActivityLog(fileURL: ActivityLog.defaultURL)
+            runner = ProcessRunner()
+            autoScan = false
+        }
+    }
+
+    func docker() -> DockerCleaner {
+        Demo.active == nil ? DockerCleaner(runner: runner) : DockerCleaner(runner: runner, binary: "/usr/local/bin/docker")
+    }
     @Published var selection: Module? = .quickScan
     @Published var activityVersion = 0
 

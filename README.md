@@ -8,6 +8,8 @@ MyOpenCleaner finds system junk, developer clutter, leftovers of removed apps, d
 - **Safe by design**: every deletion passes one safety guard that protects system folders and your personal data.
 - **Tested**: 180+ tests run against fake Macs in temporary folders, so they never touch your files.
 
+![Quick Scan](docs/screenshots/quick-scan.png)
+
 ## Requirements
 
 - macOS 14 Sonoma or later (Apple silicon or Intel)
@@ -68,6 +70,21 @@ This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./bu
 | **Similar Photos** | Groups bursts, retakes and resized copies with a perceptual hash. |
 | **Space Map** | A map of folder sizes you can click through. |
 
+## Screenshots
+
+| | |
+|---|---|
+| ![System Junk](docs/screenshots/junk.png) **System Junk** | ![Developer](docs/screenshots/developer.png) **Developer** |
+| ![Uninstaller](docs/screenshots/uninstaller.png) **Uninstaller** | ![Malware](docs/screenshots/malware.png) **Malware** |
+| ![Duplicates](docs/screenshots/duplicates.png) **Duplicates** | ![Similar Photos](docs/screenshots/similar.png) **Similar Photos** |
+| ![Space Map](docs/screenshots/space-map.png) **Space Map** | ![Large & Old Files](docs/screenshots/large-old.png) **Large & Old Files** |
+| ![Privacy](docs/screenshots/privacy.png) **Privacy** | ![Shredder](docs/screenshots/shredder.png) **Shredder** |
+| ![Mac Health](docs/screenshots/monitor.png) **Mac Health** | ![Battery](docs/screenshots/battery.png) **Battery** |
+| ![Maintenance](docs/screenshots/maintenance.png) **Maintenance** | ![Launch Items](docs/screenshots/launch-items.png) **Launch Items** |
+| ![Cloud Files](docs/screenshots/cloud.png) **Cloud Files** | ![Menu bar](docs/screenshots/menu-bar.png) **Menu bar** |
+
+The screenshots show a made-up demo Mac: every app, file, project, simulator and Wi‑Fi name in them is invented.
+
 ## Safety
 
 MyOpenCleaner is built to make the worst case boring.
@@ -88,8 +105,11 @@ The app binary has read-only modes that print what it would offer, without delet
 swift build
 .build/debug/MyOpenCleaner --scan               # system junk and launch-item threats
 .build/debug/MyOpenCleaner --dev-scan           # the Developer page
-.build/debug/MyOpenCleaner --snapshot <folder>  # render every page to PNG
+.build/debug/MyOpenCleaner --snapshot <folder>  # render every page to PNG (shows your real data)
+.build/debug/MyOpenCleaner --snapshot <folder> --demo  # the same for a made-up Mac; safe to publish
 ```
+
+`--demo` builds a fake home folder full of invented apps, junk, projects and photos in a temporary directory, answers every external tool (`simctl`, `docker`, `ps`, `networksetup`…) with canned output instead of running it, and deletes the fake Mac when it is done. File icons are replaced with neutral symbols so the screenshots do not reveal which apps are installed on the machine that renders them. The images in `docs/screenshots` were made this way.
 
 ## Development
 
@@ -104,6 +124,7 @@ Sources/MyOpenCleaner/     SwiftUI app, menu bar, settings; Battery/ for the bat
 Tests/SweepCoreTests/ engine tests against fake Macs in temporary folders
 Tests/MyOpenCleanerTests/  battery data parsing tests
 scripts/              app icon generator used by build.sh
+docs/screenshots/     README images, rendered with --snapshot --demo
 ```
 
 Every scanner takes a `SweepEnvironment` with its own home and root folder. Tests build a throwaway Mac in a temporary directory, so they run anywhere and never read or delete your real files. New features should come with tests in the same style; `RiskRegressionTests.swift` collects one test per safety issue found during review.

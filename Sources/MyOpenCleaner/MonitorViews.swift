@@ -20,6 +20,15 @@ final class MonitorModel: ObservableObject {
     private var timer: Timer?
 
     func start() {
+        if let demo = Demo.active {
+            // Screenshot mode: fixed figures, no polling of the real Mac.
+            cpu = 0.31; memory = demo.memory; disk = demo.disk; downPerSec = 2_400_000; upPerSec = 310_000
+            cpuHistory = demo.cpuHistory
+            let all = SystemMonitor.parseProcesses(demo.runner.run("/bin/ps", []).output)
+            topCPU = Array(all.sorted { $0.cpu > $1.cpu }.prefix(5))
+            topMemory = Array(all.sorted { $0.memoryBytes > $1.memoryBytes }.prefix(5))
+            return
+        }
         guard timer == nil else { return }
         tick()
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in Task { @MainActor in MonitorModel.shared.tick() } }
@@ -227,7 +236,8 @@ struct MenuPanel: View {
                     freeing = true
                     Task {
                         let task = MaintenanceTask.all.first { $0.id == "free-ram" }!
-                        _ = await AppState.background { MaintenanceRunner().run([task]) }
+                        let runner = AppState.shared.runner
+                        _ = await AppState.background { MaintenanceRunner(runner: runner).run([task]) }
                         freeing = false
                         m.tick()
                     }

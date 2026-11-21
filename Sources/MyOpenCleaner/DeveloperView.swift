@@ -52,6 +52,7 @@ struct DeveloperView: View {
                           buttonTitle: "Scan", action: scan)
             }
         }
+        .onAppear { if AppState.shared.autoScan, items == nil, !busy { scan() } }
         .confirmationDialog("Clean \(FileSize.format(chosenSize))?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: clean)
         } message: {
@@ -160,16 +161,16 @@ struct DeveloperView: View {
 
     func scan() {
         busy = true; items = nil
-        let env = state.env, roots = projectsRoot.map { [$0] }
+        let env = state.env, roots = projectsRoot.map { [$0] }, runner = state.runner, docker = state.docker()
         Task {
             progress = "Xcode, firmware, package caches…"
             let folders = await AppState.background { DevFolderScanner(env: env).scan() }
             progress = "Simulators…"
-            let sims = await AppState.background { SimulatorScanner(env: env).scan() }
+            let sims = await AppState.background { SimulatorScanner(env: env, runner: runner).scan() }
             progress = "Project builds…"
             let builds = await AppState.background { BuildArtifactFinder(env: env).find(roots: roots) }
             progress = "Docker…"
-            docker = await AppState.background { DockerCleaner().state() }
+            self.docker = await AppState.background { docker.state() }
             let all = (folders + sims + builds).sorted { $0.size > $1.size }
             items = all
             selected = Set(all.filter(\.selectedByDefault).map(\.id))
@@ -179,9 +180,9 @@ struct DeveloperView: View {
 
     func clean() {
         busy = true
-        let targets = chosen, env = state.env, cleaner = state.cleaner()
+        let targets = chosen, env = state.env, cleaner = state.cleaner(), runner = state.runner
         Task {
-            let r = await AppState.background { DevCleaner(env: env, cleaner: cleaner).remove(targets) }
+            let r = await AppState.background { DevCleaner(env: env, runner: runner, cleaner: cleaner).remove(targets) }
             state.record(.developer, r)
             message = cleanSummary(r)
             busy = false
@@ -192,8 +193,9 @@ struct DeveloperView: View {
     func pruneDocker() {
         busy = true
         let kinds = DockerPrune.allCases.filter(dockerSelected.contains)
+        let cleaner = state.docker()
         Task {
-            let (results, reclaimed) = await AppState.background { DockerCleaner().prune(kinds) }
+            let (results, reclaimed) = await AppState.background { cleaner.prune(kinds) }
             let failed = results.filter { !$0.value.ok }
             if reclaimed > 0 {
                 state.activity.record(module: "Docker", freed: reclaimed, items: kinds.count - failed.count)
@@ -201,7 +203,7 @@ struct DeveloperView: View {
             }
             message = "Docker: freed \(FileSize.format(reclaimed))."
                 + (failed.isEmpty ? "" : "\nFailed: " + failed.map { "\($0.key.title) (\($0.value.error.trimmingCharacters(in: .whitespacesAndNewlines)))" }.joined(separator: "; "))
-            docker = await AppState.background { DockerCleaner().state() }
+            docker = await AppState.background { cleaner.state() }
             busy = false
         }
     }
