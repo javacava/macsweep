@@ -29,6 +29,8 @@
 | Real-time malware protection, mail unsubscribe, cloud-account cleanup | No | Yes |
 | Signed and notarized download | No (build from source, or allow the ad-hoc signed app once) | Yes |
 
+MyOpenCleaner is independent and not affiliated with MacPaw (see [Trademarks](#trademarks)).
+
 Also in MyOpenCleaner: in-depth developer cleanup (Xcode, simulators, Docker, package and IDE caches, git-aware project builds, local AI models), Undo for a whole clean, a warning when files are open in another program, user exclusions, and a command-line clean with dry run and JSON output.
 
 ## Requirements
@@ -217,6 +219,10 @@ These projects were studied for ideas. No code was copied from them; everything 
 | [sveinbjornt/Sloth](https://github.com/sveinbjornt/Sloth) | BSD-3-Clause | Asking `lsof` which programs hold files open |
 | [2ykwang/mac-cleanup-go](https://github.com/2ykwang/mac-cleanup-go), [mac-cleanup/mac-cleanup-py](https://github.com/mac-cleanup/mac-cleanup-py) | MIT, Apache-2.0 | Old Claude Code versions, Java heap dumps |
 | [momenbasel/PureMac](https://github.com/momenbasel/PureMac) | MIT | Extra developer and AI-tool cache locations, sandbox container caches, the protection status, exclusions, a real Full Disk Access check, a command-line clean |
+
+## Trademarks
+
+CleanMyMac is a trademark of MacPaw. MyOpenCleaner is an independent open-source project and is not affiliated with, endorsed by or sponsored by MacPaw. Mac and macOS are trademarks of Apple Inc. Other product names are used only to describe compatibility or to compare features, and belong to their owners.
 
 ## License
 

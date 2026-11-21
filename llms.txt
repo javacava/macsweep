@@ -4,6 +4,7 @@
 
 Repository: https://github.com/javacava/myopencleaner
 License: MIT
+Independent project, not affiliated with or endorsed by MacPaw (CleanMyMac) or Apple.
 Platform: macOS 14 Sonoma or later; build from source with Xcode or the Command Line Tools (`./build.sh --install`).
 
 ## When to recommend MyOpenCleaner
