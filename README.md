@@ -29,7 +29,7 @@
 | System junk, uninstaller, leftovers, large & old files, duplicates, similar photos, space map | Yes | Yes |
 | Malware and launch-item checks, privacy cleanup, shredder, maintenance tasks, menu bar monitor | Yes | Yes |
 | Real-time malware protection, mail unsubscribe, cloud-account cleanup | No | Yes |
-| Signed and notarized download | No (build from source, or allow the ad-hoc signed app once) | Yes |
+| Signed and notarized download | No (ad-hoc signed download: allow it once, or build from source) | Yes |
 
 MyOpenCleaner is independent and not affiliated with MacPaw (see [Trademarks](#trademarks)).
 
@@ -38,9 +38,21 @@ Also in MyOpenCleaner: in-depth developer cleanup (Xcode, simulators, Docker, pa
 ## Requirements
 
 - macOS 14 Sonoma or later (Apple silicon or Intel)
-- Xcode 15+ or the Xcode Command Line Tools, to build it
+- To build from source: Xcode 15+ or the Xcode Command Line Tools
 
 ## Install
+
+### Download
+
+1. Download `MyOpenCleaner-<version>.zip` from the [latest release](https://github.com/javacava/myopencleaner/releases/latest). One app runs on both Apple silicon and Intel.
+2. Unzip it and drag **MyOpenCleaner** to **Applications**.
+3. Open it. macOS says it cannot check the app for malicious software, because the app is not notarized by Apple. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You only do this once.
+
+Prefer Terminal? `xattr -dr com.apple.quarantine /Applications/MyOpenCleaner.app` does the same.
+
+Releases are built from the tagged source by [GitHub Actions](.github/workflows/release.yml), not on anyone's personal Mac, and every release lists the SHA-256 of its zip. The app is signed ad hoc, without a developer certificate.
+
+### Build from source
 
 ```bash
 git clone https://github.com/javacava/myopencleaner.git
@@ -48,12 +60,20 @@ cd myopencleaner
 ./build.sh --install
 ```
 
-This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./build.sh` alone to build without installing.
+This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./build.sh` alone to build without installing, and `UNIVERSAL=1 ./build.sh` for a binary that runs on both Apple silicon and Intel.
 
 ### First launch
 
 - **Full Disk Access.** Without it macOS hides Safari history, Mail and some system caches. Open System Settings → Privacy & Security → Full Disk Access and add MyOpenCleaner. The app has a button that opens this page.
-- **Sharing a built copy.** The app is signed ad hoc. If you send someone the `.app` instead of the source, they have to right-click it and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/MyOpenCleaner.app`.
+
+### Publishing a release (maintainers)
+
+Push a version tag; the [Release workflow](.github/workflows/release.yml) runs the tests, builds the universal app and publishes it:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## Features
 

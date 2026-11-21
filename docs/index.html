@@ -41,6 +41,7 @@
   "image": "https://javacava.github.io/myopencleaner/assets/icon.png",
   "screenshot": "https://javacava.github.io/myopencleaner/assets/shots/quick-scan.jpg",
   "softwareVersion": "1.0",
+  "downloadUrl": "https://github.com/javacava/myopencleaner/releases/latest",
   "featureList": "System junk cleanup, Xcode and developer cache cleanup, app uninstaller with leftovers, duplicate finder, similar photos, disk space map, malware and launch item checks, privacy cleanup, file shredder, maintenance tasks, undo for every clean, command-line clean"
 }
 </script>
@@ -527,7 +528,7 @@ Trash: 209.7 MB (2)
             <tr><td>Junk, uninstaller, leftovers, large files, duplicates, similar photos, space map</td><td class="us yes">Yes</td><td>Yes</td></tr>
             <tr><td>Malware and launch items, privacy, shredder, maintenance, menu bar monitor</td><td class="us yes">Yes</td><td>Yes</td></tr>
             <tr><td>Real-time malware protection, mail unsubscribe, cloud-account cleanup</td><td class="us no">No</td><td>Yes</td></tr>
-            <tr><td>Signed and notarized download</td><td class="us no">No — build from source</td><td>Yes</td></tr>
+            <tr><td>Signed and notarized download</td><td class="us no">No — allow it once, or build from source</td><td>Yes</td></tr>
           </tbody>
         </table>
       </div>
@@ -556,7 +557,7 @@ Trash: 209.7 MB (2)
         <details><summary>How do I remove Ollama, LM Studio or Hugging Face models?</summary>
           <p>Developer → Downloaded AI models lists each model with its size. Nothing is preselected, and for Ollama, layers shared with other models are kept.</p></details>
         <details><summary>Why is it not notarized?</summary>
-          <p>It is a free project without a paid Apple developer account. Build it from source in one command, or right-click the app and choose Open the first time.</p></details>
+          <p>It is a free project without a paid Apple developer account. The download is built by GitHub Actions and signed ad hoc: the first time, open System Settings → Privacy &amp; Security and click Open Anyway. Or build it from source in one command.</p></details>
       </div>
     </div>
   </section>
@@ -578,7 +579,7 @@ Trash: 209.7 MB (2)
   <section id="install" class="center install">
     <div class="wrap">
       <p class="eyebrow reveal">Lift-off</p>
-      <h2 class="reveal">Ready in <span class="grad">one command.</span></h2>
+      <h2 class="reveal">Download it, or build it in <span class="grad">one command.</span></h2>
       <div class="term reveal">
         <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
 <pre><span class="p">$</span> git clone https://github.com/javacava/myopencleaner.git
@@ -587,13 +588,13 @@ Trash: 209.7 MB (2)
 <span class="ok">Installed to /Applications/MyOpenCleaner.app</span></pre>
       </div>
       <div class="install-steps">
-        <div class="step reveal"><div class="n">01</div><h4>Build</h4><p>Needs macOS 14+ and Xcode or the Command Line Tools. Works on Apple silicon and Intel.</p></div>
+        <div class="step reveal"><div class="n">01</div><h4>Install</h4><p>Download the app for Apple silicon and Intel, drag it to Applications and click Open Anyway once in Privacy &amp; Security. Or build it with Xcode or the Command Line Tools. macOS 14+.</p></div>
         <div class="step reveal"><div class="n">02</div><h4>Give access</h4><p>Allow Full Disk Access so it can see Safari, Mail and system caches. The app opens the right page for you.</p></div>
         <div class="step reveal"><div class="n">03</div><h4>Scan</h4><p>Start with Quick Scan. Nothing is removed until you choose — and Undo is one click away.</p></div>
       </div>
       <div class="buttons reveal" style="margin-top:56px">
-        <a class="btn btn-primary" href="https://github.com/javacava/myopencleaner">View on GitHub</a>
-        <a class="btn btn-ghost" href="https://github.com/javacava/myopencleaner#readme">Read the docs ›</a>
+        <a class="btn btn-primary" href="https://github.com/javacava/myopencleaner/releases/latest">Download for Mac</a>
+        <a class="btn btn-ghost" href="https://github.com/javacava/myopencleaner">View on GitHub ›</a>
       </div>
     </div>
   </section>
