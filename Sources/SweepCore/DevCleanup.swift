@@ -3,7 +3,7 @@ import Foundation
 /// One thing the Developer page can remove: a simulator, a runtime, a firmware file, a cache, a build folder.
 public struct DevItem: Identifiable, Hashable, Sendable {
     public enum Group: String, CaseIterable, Sendable, Identifiable {
-        case simulators, runtimes, firmware, xcode, android, packageCaches, builds
+        case simulators, runtimes, firmware, xcode, android, packageCaches, aiTools, builds
 
         public var id: String { rawValue }
 
@@ -15,6 +15,7 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .xcode: "Xcode builds and caches"
             case .android: "Android emulators"
             case .packageCaches: "npm and other package manager caches"
+            case .aiTools: "AI tool logs and caches"
             case .builds: "Builds and dependencies in projects"
             }
         }
@@ -27,6 +28,7 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .xcode: "hammer"
             case .android: "candybarphone"
             case .packageCaches: "shippingbox"
+            case .aiTools: "brain"
             case .builds: "folder.badge.gearshape"
             }
         }
@@ -39,6 +41,7 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .xcode: "Intermediate build files. Xcode rebuilds them; the first build takes longer."
             case .android: "Android Studio virtual devices and downloaded system images."
             case .packageCaches: "Downloaded packages. The package manager fetches them again when needed."
+            case .aiTools: "Logs and caches of local AI apps such as Ollama and LM Studio. Downloaded models and chat history are never offered."
             case .builds: "node_modules, .build, target, Pods and so on. Restored by the project's install or build command."
             }
         }
@@ -66,7 +69,7 @@ public struct DevItem: Identifiable, Hashable, Sendable {
 // MARK: - Folders (firmware, Xcode, Android, package caches)
 
 struct DevFolderRule {
-    enum Mode { case children, whole }
+    enum Mode: Equatable { case children, whole }
     let group: DevItem.Group
     let title: String
     let path: String
@@ -97,6 +100,7 @@ public struct DevFolderScanner: Sendable {
         .init(group: .xcode, title: "SwiftUI Previews simulators", path: "~/Library/Developer/Xcode/UserData/Previews/Simulator Devices"),
         .init(group: .xcode, title: "Device logs", path: "~/Library/Developer/Xcode/iOS Device Logs"),
         .init(group: .xcode, title: "Documentation cache", path: "~/Library/Developer/Xcode/DocumentationCache"),
+        .init(group: .xcode, title: "XCTest devices", path: "~/Library/Developer/XCTestDevices", mode: .children),
         // Package managers
         .init(group: .packageCaches, title: "npm", path: "~/.npm/_cacache"),
         .init(group: .packageCaches, title: "npx", path: "~/.npm/_npx"),
@@ -118,6 +122,24 @@ public struct DevFolderScanner: Sendable {
         .init(group: .packageCaches, title: "Flutter / Dart pub", path: "~/.pub-cache", selected: false),
         .init(group: .packageCaches, title: "Playwright (browsers)", path: "~/Library/Caches/ms-playwright", selected: false),
         .init(group: .packageCaches, title: "Cypress", path: "~/Library/Caches/Cypress", selected: false),
+        .init(group: .packageCaches, title: "Yarn (~/.cache)", path: "~/.cache/yarn"),
+        .init(group: .packageCaches, title: "pnpm (~/.local/share)", path: "~/.local/share/pnpm/store", selected: false),
+        .init(group: .packageCaches, title: "pnpm (~/.pnpm-store)", path: "~/.pnpm-store", selected: false),
+        .init(group: .packageCaches, title: "uv", path: "~/.cache/uv"),
+        .init(group: .packageCaches, title: "uv (Library)", path: "~/Library/Caches/uv"),
+        .init(group: .packageCaches, title: "Poetry", path: "~/Library/Caches/pypoetry"),
+        .init(group: .packageCaches, title: "Deno", path: "~/Library/Caches/deno"),
+        .init(group: .packageCaches, title: "Puppeteer (browsers)", path: "~/.cache/puppeteer", selected: false),
+        .init(group: .packageCaches, title: "Go (modules)", path: "~/go/pkg/mod", selected: false),
+        .init(group: .packageCaches, title: "Gradle (wrapper distributions)", path: "~/.gradle/wrapper/dists", selected: false),
+        .init(group: .packageCaches, title: "Cargo (git checkouts)", path: "~/.cargo/git/checkouts"),
+        .init(group: .packageCaches, title: "Cargo (git database)", path: "~/.cargo/git/db", selected: false),
+        .init(group: .packageCaches, title: "NuGet", path: "~/.nuget/packages", selected: false),
+        // Local AI apps: logs and caches only, never models or conversations.
+        .init(group: .aiTools, title: "Ollama logs", path: "~/.ollama/logs"),
+        .init(group: .aiTools, title: "Ollama cache", path: "~/Library/Caches/ollama"),
+        .init(group: .aiTools, title: "Ollama app cache", path: "~/Library/Caches/com.electron.ollama"),
+        .init(group: .aiTools, title: "LM Studio server logs", path: "~/.lmstudio/server-logs"),
     ]
 
     public func scan() -> [DevItem] {
@@ -125,7 +147,7 @@ public struct DevFolderScanner: Sendable {
         var out: [DevItem] = []
         for rule in Self.rules {
             let dir = env.resolve(rule.path)
-            guard dir.isDirectoryURL else { continue }
+            guard dir.isDirectoryURL, !env.isExcluded(dir) || rule.mode == .children else { continue }
             switch rule.mode {
             case .whole:
                 let size = FileSize.of(dir)
@@ -133,7 +155,7 @@ public struct DevFolderScanner: Sendable {
                 out.append(DevItem(id: dir.path, group: rule.group, title: rule.title, detail: env.displayPath(dir),
                                    size: size, removal: .files([dir]), selectedByDefault: rule.selected, location: dir))
             case .children:
-                for child in fm.children(of: dir) where !child.lastPathComponent.hasPrefix(".") {
+                for child in fm.children(of: dir) where !child.lastPathComponent.hasPrefix(".") && !env.isExcluded(child) {
                     let size = FileSize.of(child)
                     guard size > 0 else { continue }
                     out.append(DevItem(id: child.path, group: rule.group, title: child.lastPathComponent,
@@ -151,7 +173,7 @@ public struct DevFolderScanner: Sendable {
         let fm = FileManager.default
         var out: [DevItem] = []
         let avdDir = env.resolve("~/.android/avd")
-        for avd in fm.children(of: avdDir) where avd.pathExtension == "avd" {
+        for avd in fm.children(of: avdDir) where avd.pathExtension == "avd" && !env.isExcluded(avd) {
             let ini = avd.deletingPathExtension().appendingPathExtension("ini")
             let files = [avd] + (fm.fileExists(atPath: ini.path) ? [ini] : [])
             out.append(DevItem(id: avd.path, group: .android, title: avd.deletingPathExtension().lastPathComponent,
@@ -319,6 +341,7 @@ public struct BuildArtifactFinder: Sendable {
             let name = child.lastPathComponent
             guard let v = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                   v.isDirectory == true, v.isSymbolicLink != true else { continue }
+            if env.isExcluded(child) { continue }
             if let kind = Self.kinds.first(where: { $0.folder == name }) {
                 // An artifact name without its project marker (a random folder called "build") is left
                 // alone, and never entered: a stray node_modules is not walked either.

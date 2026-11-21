@@ -2,6 +2,37 @@ import SwiftUI
 import UniformTypeIdentifiers
 import SweepCore
 
+// `MyOpenCleaner --clean …`: clean junk from the terminal. A dry run unless `--yes` is given.
+if let i = CommandLine.arguments.firstIndex(of: "--clean") {
+    var env = SweepEnvironment.live
+    env.exclusions = AppState.exclusions.map { URL(fileURLWithPath: $0) }
+    switch CommandLineClean.parse(Array(CommandLine.arguments[(i + 1)...])) {
+    case .success(let options):
+        let (out, status) = CommandLineClean.run(options, env: env)
+        print(out)
+        exit(status)
+    case .failure(.help):
+        print(CommandLineClean.usage)
+        exit(0)
+    case .failure(.message(let m)):
+        FileHandle.standardError.write(Data((m + "\n\n" + CommandLineClean.usage + "\n").utf8))
+        exit(2)
+    }
+}
+
+if CommandLine.arguments.contains("--help") {
+    print("""
+    MyOpenCleaner — an open-source Mac cleaner.
+
+      MyOpenCleaner                         open the app
+      MyOpenCleaner --scan                  print system junk and launch-item threats (removes nothing)
+      MyOpenCleaner --dev-scan              print what the Developer page would offer (removes nothing)
+      MyOpenCleaner --clean [options]       clean system junk; a dry run unless --yes (see --clean --help)
+      MyOpenCleaner --snapshot DIR [--demo] render every page to PNG; --demo uses a made-up Mac
+    """)
+    exit(0)
+}
+
 // `MyOpenCleaner --scan` prints what the junk scanner finds and exits (nothing is deleted).
 if CommandLine.arguments.contains("--scan") {
     let env = SweepEnvironment.live
@@ -216,6 +247,7 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 Toggle("Record battery health to history once a day", isOn: $autoHistory)
             }
+            ExclusionsSettings()
             LabeledContent("Full Disk Access") {
                 Button("Open Settings") { AppState.openFullDiskAccessSettings() }
             }
@@ -223,7 +255,48 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 480)
+        .frame(width: 520)
         .padding()
+    }
+}
+
+/// Paths MyOpenCleaner must never offer for removal. Also added from any file list's context menu.
+struct ExclusionsSettings: View {
+    @ObservedObject private var state = AppState.shared
+    @State private var selection: String?
+
+    var paths: [String] { _ = state.exclusionsVersion; return AppState.exclusions }
+
+    var body: some View {
+        Section {
+            if paths.isEmpty {
+                Text("Nothing excluded. Right-click a file in any list and choose \"Never offer this again\", or add a folder here.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(paths, id: \.self) { p in
+                HStack {
+                    Image(systemName: "nosign").foregroundStyle(.secondary)
+                    Text(state.display(URL(fileURLWithPath: p))).lineLimit(1).truncationMode(.middle)
+                    Spacer()
+                    Button { remove(p) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless)
+                }
+            }
+            Button("Add folder or file…") {
+                let p = NSOpenPanel()
+                p.canChooseFiles = true; p.canChooseDirectories = true; p.allowsMultipleSelection = true
+                p.prompt = "Exclude"
+                if p.runModal() == .OK { p.urls.forEach(state.exclude) }
+            }
+        } header: {
+            Text("Exclusions")
+        } footer: {
+            Text("Excluded paths, and everything inside them, are never offered for removal by any page.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    func remove(_ p: String) {
+        AppState.exclusions.removeAll { $0 == p }
+        state.exclusionsVersion += 1
     }
 }

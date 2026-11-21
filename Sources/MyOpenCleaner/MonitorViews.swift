@@ -79,8 +79,15 @@ struct MonitorView: View {
                                       value: "\(Int(mem.usedFraction * 100))%", tint: pressureColor(mem.pressure))
                         }
                         if let d = m.disk {
-                            GaugeRing(fraction: d.usedFraction, label: "\(FileSize.format(d.available)) free",
-                                      value: "\(Int(d.usedFraction * 100))%", tint: .teal)
+                            VStack(spacing: 2) {
+                                GaugeRing(fraction: d.usedFraction, label: "\(FileSize.format(d.available)) free",
+                                          value: "\(Int(d.usedFraction * 100))%", tint: .teal)
+                                if d.purgeable > 0 {
+                                    Text("incl. \(FileSize.format(d.purgeable)) purgeable")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                        .help("Caches and local Time Machine snapshots macOS frees by itself when space runs low. Thin Time Machine snapshots under Maintenance to free it now.")
+                                }
+                            }
                         }
                         VStack(alignment: .leading, spacing: 8) {
                             Label(MonitorModel.rate(m.downPerSec), systemImage: "arrow.down.circle")

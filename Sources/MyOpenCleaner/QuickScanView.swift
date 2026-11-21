@@ -15,6 +15,7 @@ struct QuickScanView: View {
             EmptyView()
         } content: {
             VStack(spacing: 24) {
+                FullDiskAccessBanner()
                 Spacer()
                 if busy {
                     ProgressView().controlSize(.large)

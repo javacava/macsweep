@@ -169,7 +169,8 @@ public struct LeftoverFinder: Sendable {
                    Self.containerIdentifier(child)?.lowercased() == app.bundleID.lowercased() {
                     hit = true
                 }
-                guard hit, !child.isInside(app.url), seen.insert(child.standardizedFileURL.path).inserted else { continue }
+                guard hit, !child.isInside(app.url), !env.isExcluded(child),
+                      seen.insert(child.standardizedFileURL.path).inserted else { continue }
                 out.append(Leftover(url: child, size: FileSize.of(child), location: folder.title))
             }
         }
@@ -188,7 +189,7 @@ public struct LeftoverFinder: Sendable {
             for child in fm.children(of: env.resolve(path)) {
                 var id = Self.stem(child.lastPathComponent)
                 if path.hasSuffix("Containers"), let meta = Self.containerIdentifier(child) { id = meta.lowercased() }
-                guard Self.looksLikeBundleID(id), !Self.isSystemID(id) else { continue }
+                guard Self.looksLikeBundleID(id), !Self.isSystemID(id), !env.isExcluded(child) else { continue }
                 if ids.contains(where: { id == $0 || id.hasPrefix($0 + ".") || $0.hasPrefix(id + ".") }) { continue }
                 // Same vendor as something installed ("com.google.Keystone" next to Chrome): most likely a
                 // helper of living software, so leave it. Missing a real leftover is the cheaper mistake.

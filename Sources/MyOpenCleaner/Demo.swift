@@ -116,6 +116,7 @@ final class DemoMac: @unchecked Sendable {
         try seedPhotos()
         try seedLaunchItems()
         try seedPrivacyAndCloud()
+        try seedExtras()
         try seedActivity()
     }
 
@@ -282,6 +283,21 @@ final class DemoMac: @unchecked Sendable {
         try file("~/Library/CloudStorage/OneDrive-Personal/Documents/Annual Report.pptx", mb: 24)
     }
 
+    private func seedExtras() throws {
+        try plist("/Library/Preferences/com.apple.SoftwareUpdate.plist",
+                  ["CriticalUpdateInstall": true, "ConfigDataInstall": true, "AutomaticallyInstallMacOSUpdates": false])
+        try file("~/.ollama/logs/server.log", mb: 24)
+        try file("~/.ollama/models/blobs/sha256-demo", mb: 70)   // never offered
+        try file("~/Library/Caches/ollama/runners/x", mb: 9)
+        try file("~/.lmstudio/server-logs/2024-11.log", mb: 3)
+        try file("~/.cache/uv/wheels-v1/x", mb: 70)
+        try file("~/Library/Caches/pypoetry/cache/x", mb: 24)
+        try file("~/go/pkg/mod/cache/download/x", mb: 130)
+        try file("~/Library/Containers/com.example.Notekeeper/Data/Library/Caches/com.example.Notekeeper/Cache.db", mb: 24)
+        try file("~/Library/Containers/com.example.Tasklet/Data/Library/Caches/WebKit/NetworkCache", mb: 9)
+        try file("~/Library/Group Containers/DEMO123.com.example.shared/Library/Caches/thumbnails.db", mb: 3)
+    }
+
     private func seedActivity() throws {
         let log = ActivityLog(fileURL: activityURL)
         for (days, module, mb, n) in [(28.0, "System Junk", 4_200, 312), (21, "Developer", 18_600, 9), (14, "Duplicates", 2_100, 14),
@@ -413,6 +429,14 @@ struct DemoRunner: CommandRunning {
             return ok("Preferred networks on en0:\n\tHome Network\n\tOffice Wi-Fi\n\tCoffee Shop Guest\n\tAirport Free Wi-Fi\n")
         }
         if cmd.hasPrefix("/bin/ps") { return ok(processes) }
+        if cmd.hasPrefix("/usr/bin/fdesetup status") { return ok("FileVault is On.") }
+        if cmd.hasPrefix("/usr/bin/csrutil status") { return ok("System Integrity Protection status: enabled.") }
+        if cmd.hasPrefix("/usr/sbin/spctl --status") { return ok("assessments enabled") }
+        if cmd.hasPrefix("/usr/libexec/ApplicationFirewall/socketfilterfw") { return ok("Firewall is disabled. (State = 0)") }
+        if cmd.hasPrefix("/usr/bin/xprotect version") {
+            let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
+            return ok("Version: 5361 Installed: \(f.string(from: Date().addingTimeInterval(-6 * 86_400)))")
+        }
         return ok("")
     }
 
@@ -482,7 +506,7 @@ extension DemoMac {
         return MemoryStats(total: 36 * gb, free: 6 * gb, active: 14 * gb, inactive: 6 * gb, wired: 4 * gb,
                            compressed: 3 * gb, purgeable: 1 * gb, external: 2 * gb)
     }
-    var disk: DiskStats { DiskStats(total: 994_662_584_320, available: 312_480_000_000) }
+    var disk: DiskStats { DiskStats(total: 994_662_584_320, available: 312_480_000_000, strictlyFree: 297_900_000_000) }
     var cpuHistory: [Double] {
         (0..<60).map { (i: Int) -> Double in
             let t = Double(i)

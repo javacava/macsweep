@@ -4,6 +4,8 @@ import Foundation
 /// the app uses the real home folder and `/`.
 public struct SweepEnvironment: Sendable {
     public var home: URL
+    /// Paths the user never wants offered for removal (Settings → Exclusions).
+    public var exclusions: [URL] = []
     public var root: URL
     public var now: @Sendable () -> Date
 
@@ -24,6 +26,17 @@ public struct SweepEnvironment: Sendable {
         if path.hasPrefix("~/") { return home.appendingPathComponent(String(path.dropFirst(2))) }
         let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
         return trimmed.isEmpty ? root : root.appendingPathComponent(trimmed)
+    }
+
+    /// True when removing `url` would touch an excluded path: the path itself, something inside it,
+    /// or a folder that contains it.
+    public func isExcluded(_ url: URL) -> Bool {
+        guard !exclusions.isEmpty else { return false }
+        let u = url.resolvingSymlinksInPath().standardizedFileURL
+        return exclusions.contains { e in
+            let x = e.resolvingSymlinksInPath().standardizedFileURL
+            return u.isInside(x) || x.isInside(u)
+        }
     }
 
     /// The reverse of `resolve` for display: `/Users/x/Library` → `~/Library`.

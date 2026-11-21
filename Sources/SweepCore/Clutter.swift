@@ -81,7 +81,7 @@ public struct LargeOldFinder: Sendable {
     /// Files of at least `minSize`, or (when `olderThanDays` is set) also untouched for that many days.
     public func find(minSize: Int64 = 100 * 1_048_576, olderThanDays: Int? = nil,
                      roots: [URL]? = nil, cancelled: () -> Bool = { false }) -> [FileEntry] {
-        let walker = FileWalker(skip: [env.home.appendingPathComponent("Library"),
+        let walker = FileWalker(skip: env.exclusions + [env.home.appendingPathComponent("Library"),
                                        env.home.appendingPathComponent(".Trash")])
         let scanRoots = roots ?? [env.home]
         let cutoff = olderThanDays.map { env.now().addingTimeInterval(-Double($0) * 86_400) }

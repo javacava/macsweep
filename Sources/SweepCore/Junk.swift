@@ -2,7 +2,7 @@ import Foundation
 
 public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     case userCache, systemCache, userLogs, systemLogs, browserCache, xcode, devTools
-    case mailAttachments, trash, iosBackups, brokenDownloads, installers
+    case containerCaches, mailAttachments, trash, iosBackups, brokenDownloads, installers
 
     public var id: String { rawValue }
 
@@ -20,6 +20,7 @@ public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable 
         case .iosBackups: "iOS backups"
         case .brokenDownloads: "Incomplete downloads"
         case .installers: "Installers in Downloads"
+        case .containerCaches: "App container caches"
         }
     }
 
@@ -35,6 +36,7 @@ public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable 
         case .iosBackups: "iphone"
         case .brokenDownloads: "arrow.down.circle.dotted"
         case .installers: "opticaldiscdrive"
+        case .containerCaches: "square.stack.3d.down.right"
         }
     }
 }
@@ -45,6 +47,8 @@ public struct JunkRule: Sendable, Identifiable {
         case children
         /// The folder's direct children that are files with one of these extensions.
         case files(extensions: Set<String>)
+        /// `path` is a folder of app containers; the children of each container's Caches folder are items.
+        case containerCaches(cachesPath: String)
     }
 
     public let id: String
@@ -123,6 +127,10 @@ public enum JunkRules {
                  selectedByDefault: false),
         JunkRule(id: "broken-downloads", category: .brokenDownloads, path: "~/Downloads",
                  mode: .files(extensions: ["crdownload", "part", "partial", "download", "opdownload"]), minAge: day),
+        JunkRule(id: "container-caches", category: .containerCaches, path: "~/Library/Containers",
+                 mode: .containerCaches(cachesPath: "Data/Library/Caches"), excludes: userCacheExcludes),
+        JunkRule(id: "group-container-caches", category: .containerCaches, path: "~/Library/Group Containers",
+                 mode: .containerCaches(cachesPath: "Library/Caches"), excludes: userCacheExcludes),
         JunkRule(id: "installers", category: .installers, path: "~/Downloads",
                  mode: .files(extensions: ["dmg", "pkg", "mpkg", "xip"]), minAge: 7 * day, selectedByDefault: false),
     ]
@@ -160,6 +168,8 @@ public final class JunkScanner: @unchecked Sendable {
         self.rules = rules
     }
 
+    static let containerCacheMinSize: Int64 = 512 * 1024
+
     public func scan(categories: Set<JunkCategory> = Set(JunkCategory.allCases),
                      progress: ((JunkRule) -> Void)? = nil) -> JunkScanResult {
         var result = JunkScanResult(items: [], unreadable: [])
@@ -169,13 +179,18 @@ public final class JunkScanner: @unchecked Sendable {
             let dir = env.resolve(rule.path)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else { continue }
-            guard let children = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: FileSize.keys) else {
+            guard var children = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: FileSize.keys) else {
                 result.unreadable.append(dir)
                 continue
             }
+            if case .containerCaches(let cachesPath) = rule.mode {
+                // Caches inside each sandbox container; tiny ones are left out to keep the list readable.
+                children = children.flatMap { fm.children(of: $0.appendingPathComponent(cachesPath)) }
+                    .filter { !$0.lastPathComponent.hasPrefix(".") && FileSize.of($0) >= Self.containerCacheMinSize }
+            }
             for child in children {
                 let name = child.lastPathComponent
-                if rule.excludes.contains(name.lowercased()) { continue }
+                if rule.excludes.contains(name.lowercased()) || env.isExcluded(child) { continue }
                 if case .files(let exts) = rule.mode {
                     guard exts.contains(child.pathExtension.lowercased()), !child.isDirectoryURL || child.pathExtension == "download"
                     else { continue }

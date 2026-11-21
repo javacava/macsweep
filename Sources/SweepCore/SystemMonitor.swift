@@ -55,7 +55,15 @@ public struct DiskStats: Equatable, Sendable {
     public var total: Int64
     public var available: Int64
 
-    public init(total: Int64, available: Int64) { self.total = total; self.available = available }
+    /// Free space not counting what macOS could purge (caches, local snapshots). nil when unknown.
+    public var strictlyFree: Int64?
+
+    public init(total: Int64, available: Int64, strictlyFree: Int64? = nil) {
+        self.total = total; self.available = available; self.strictlyFree = strictlyFree
+    }
+
+    /// Space macOS reports as available but only frees on demand (purgeable caches, local Time Machine snapshots).
+    public var purgeable: Int64 { strictlyFree.map { max(available - $0, 0) } ?? 0 }
     public var used: Int64 { total - available }
     public var usedFraction: Double { total > 0 ? Double(used) / Double(total) : 0 }
 }
@@ -108,9 +116,10 @@ public enum SystemMonitor {
     }
 
     public static func disk(_ volume: URL = URL(fileURLWithPath: "/")) -> DiskStats? {
-        guard let v = try? volume.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]),
+        guard let v = try? volume.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey,
+                                                           .volumeAvailableCapacityKey]),
               let total = v.volumeTotalCapacity, let avail = v.volumeAvailableCapacityForImportantUsage else { return nil }
-        return DiskStats(total: Int64(total), available: avail)
+        return DiskStats(total: Int64(total), available: avail, strictlyFree: v.volumeAvailableCapacity.map(Int64.init))
     }
 
     /// Bytes in/out over all non-loopback interfaces since boot.

@@ -89,7 +89,41 @@ struct FileRow: View {
                 .buttonStyle(.borderless).help("Show in Finder")
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            Button("Show in Finder") { AppState.reveal(url) }
+            Button("Never offer this again") {
+                AppState.shared.exclude(url)
+                isOn = false
+            }
+        }
     }
+}
+
+/// Shown when MyOpenCleaner cannot read protected folders. Checks again every few seconds and
+/// disappears by itself once access is granted.
+struct FullDiskAccessBanner: View {
+    @State private var state = FullDiskAccess.unknown
+    let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Group {
+            if state == .denied {
+                HStack {
+                    Image(systemName: "lock.shield").foregroundStyle(.orange)
+                    Text("MyOpenCleaner has no Full Disk Access, so it cannot see Safari, Mail and some system caches.")
+                        .font(.callout)
+                    Spacer()
+                    Button("Open Settings") { AppState.openFullDiskAccessSettings() }
+                }
+                .padding(10)
+                .background(.orange.opacity(0.1))
+            }
+        }
+        .onAppear(perform: check)
+        .onReceive(timer) { _ in if state == .denied { check() } }
+    }
+
+    func check() { state = FullDiskAccess.check(env: AppState.shared.env) }
 }
 
 /// The Finder icon of a file. In demo mode a neutral symbol instead, because Finder icons reveal

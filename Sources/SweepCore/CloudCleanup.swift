@@ -39,7 +39,7 @@ public struct CloudScanner: Sendable {
     public func scan(minSize: Int64 = 10 * 1_048_576) -> [CloudFile] {
         CloudProvider.allCases.flatMap { provider in
             provider.roots(env: env).flatMap { root in
-                FileWalker().files(under: root, minSize: minSize)
+                FileWalker(skip: env.exclusions).files(under: root, minSize: minSize)
                     .filter { isLocal($0.url) }
                     .map { CloudFile(entry: $0, provider: provider) }
             }

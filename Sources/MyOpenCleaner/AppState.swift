@@ -80,7 +80,7 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    let env: SweepEnvironment
+    private let baseEnv: SweepEnvironment
     let activity: ActivityLog
     /// Every external tool the pages call goes through this; the demo Mac swaps in canned answers.
     let runner: CommandRunning
@@ -89,17 +89,41 @@ final class AppState: ObservableObject {
 
     private init() {
         if let demo = Demo.active {
-            env = demo.env
+            baseEnv = demo.env
             activity = ActivityLog(fileURL: demo.activityURL)
             runner = demo.runner
             autoScan = true
         } else {
-            env = .live
+            baseEnv = .live
             activity = ActivityLog(fileURL: ActivityLog.defaultURL)
             runner = ProcessRunner()
             autoScan = false
         }
     }
+
+    /// The environment for a scan, with the user's current exclusions.
+    var env: SweepEnvironment {
+        var e = baseEnv
+        if Demo.active == nil { e.exclusions = Self.exclusions.map { URL(fileURLWithPath: $0) } }
+        return e
+    }
+
+    // MARK: Exclusions (Settings)
+
+    nonisolated static let exclusionsKey = "exclusions"
+
+    nonisolated static var exclusions: [String] {
+        get { UserDefaults.standard.stringArray(forKey: exclusionsKey) ?? [] }
+        set { UserDefaults.standard.set(Array(Set(newValue)).sorted(), forKey: exclusionsKey) }
+    }
+
+    /// Adds a path; it is never offered for removal again.
+    func exclude(_ url: URL) {
+        Self.exclusions.append(url.resolvingSymlinksInPath().standardizedFileURL.path)
+        exclusionsVersion += 1
+    }
+
+    @Published var exclusionsVersion = 0
 
     func docker() -> DockerCleaner {
         Demo.active == nil ? DockerCleaner(runner: runner) : DockerCleaner(runner: runner, binary: "/usr/local/bin/docker")

@@ -51,6 +51,7 @@ public struct SafetyGuard: Sendable {
         if raw.isEmpty || !raw.hasPrefix("/") { return .denied("Path is not absolute") }
         if raw.split(separator: "/").contains("..") { return .denied("Path contains \"..\"") }
         let u = url.standardizedFileURL.resolvingSymlinksInParent()
+        if env.isExcluded(u) { return .denied("Excluded in Settings") }
         let path = Self.canonical(u.path)
         func inside(_ p: String, _ tree: String) -> Bool { p == tree || p.hasPrefix(tree.hasSuffix("/") ? tree : tree + "/") }
         // Deny rules compare case-insensitively: on a default (case-insensitive) APFS volume

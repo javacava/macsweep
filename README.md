@@ -6,7 +6,7 @@ MyOpenCleaner finds system junk, developer clutter, leftovers of removed apps, d
 
 - **Native and small**: one SwiftUI app, no Electron, no background daemon, no network calls except optional update checks.
 - **Safe by design**: every deletion passes one safety guard that protects system folders and your personal data.
-- **Tested**: 180+ tests run against fake Macs in temporary folders, so they never touch your files.
+- **Tested**: 200+ tests run against fake Macs in temporary folders, so they never touch your files.
 
 ![Quick Scan](docs/screenshots/quick-scan.png)
 
@@ -37,15 +37,15 @@ This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./bu
 | Page | What it does |
 |---|---|
 | **Quick Scan** | One scan across junk, threats, app leftovers and maintenance. Asks before cleaning and never needs a password. |
-| **System Junk** | User and system caches, logs, browser caches, Xcode junk, package manager caches, Mail attachments older than 30 days, Trash, iOS backups, incomplete downloads, old installers. |
-| **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData and Xcode archives, Android emulators, npm/npx/Yarn/pnpm/Bun/pip/CocoaPods/SwiftPM/Gradle/Cargo/Go caches, project builds (`node_modules`, `.build`, `target`, `Pods`, `build`), and Docker build cache, images, containers and volumes. |
+| **System Junk** | User and system caches, logs, browser caches, caches inside sandboxed app containers, Xcode junk, package manager caches, Mail attachments older than 30 days, Trash, iOS backups, incomplete downloads, old installers. |
+| **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData, Xcode archives and XCTest devices, Android emulators, npm/npx/Yarn/pnpm/Bun/uv/pip/Poetry/Deno/CocoaPods/SwiftPM/Gradle/Cargo/Go/NuGet/Puppeteer caches, logs and caches of local AI tools (Ollama, LM Studio; never models or chats), project builds (`node_modules`, `.build`, `target`, `Pods`, `build`), and Docker build cache, images, containers and volumes. |
 | **Cloud Files** | Large local copies from iCloud Drive, Dropbox, Google Drive and OneDrive. iCloud files can be kept in the cloud only. |
 
 ### Protection
 
 | Page | What it does |
 |---|---|
-| **Malware** | Checks every launch agent and daemon against known adware and miner families, and flags suspicious ones: programs in `/tmp`, hidden folders, fake Apple names, unsigned binaries with random names. Also finds launch items whose app is gone. |
+| **Malware** | Shows the state of the Mac's own protection (FileVault, System Integrity Protection, Gatekeeper, firewall, XProtect definitions, automatic security updates) with a link to fix each one. Checks every launch agent and daemon against known adware and miner families, and flags suspicious ones: programs in `/tmp`, hidden folders, fake Apple names, unsigned binaries with random names. Also finds launch items whose app is gone. |
 | **Privacy** | Browsing history, cookies and autofill for Safari, Chrome, Edge, Brave and Firefox (every profile), recent items, saved Wi‑Fi networks. Passwords and bookmarks are never touched. |
 | **Shredder** | Drop files or folders on the window or the Dock icon. Contents are overwritten with random data (1, 3 or 7 passes) and deleted without going to the Trash. |
 
@@ -55,7 +55,7 @@ This builds `dist/MyOpenCleaner.app` and copies it to `/Applications`. Use `./bu
 |---|---|
 | **Maintenance** | Free RAM, flush DNS, reindex Spotlight, rebuild Launch Services, thin Time Machine snapshots, reset Quick Look, verify the startup disk, clear the font cache. Tasks that need a password share one prompt. |
 | **Launch Items** | Turn launchd agents and daemons off and on. |
-| **Mac Health** | Live CPU, memory pressure, disk, network and the heaviest processes, plus how much space MyOpenCleaner has freed. Also in the menu bar. |
+| **Mac Health** | Live CPU, memory pressure, disk (including purgeable space macOS frees on demand), network and the heaviest processes, plus how much space MyOpenCleaner has freed. Also in the menu bar. |
 | **Battery** | Health, cycle count, temperature, power draw, adapter, manufacture date and raw registry data for your Mac, and for an iPhone or iPad connected by cable. Keeps a health history you can export as CSV. |
 
 ### Applications and clutter
@@ -93,16 +93,27 @@ MyOpenCleaner is built to make the worst case boring.
 - **Trash first.** Everything goes to the Trash unless you switch to permanent deletion in Settings. Only privacy traces, the Shredder, simulators and Docker delete permanently, and each of them says so before it starts.
 - **Nothing preselected that you might miss.** Scanning changes nothing. Risky items (iOS backups, Xcode archives, installers, leftovers, simulators, project builds, duplicates, similar photos) start unselected.
 - **No silent removals.** Quick Scan asks before cleaning and only reports launch items; removing one is always your decision.
+- **Your exclusions win.** Add any file or folder in Settings → Exclusions, or right-click it in a list and choose "Never offer this again". Excluded paths, and everything inside them, are hidden from every page and refused by `SafetyGuard`.
 - **No shell.** External tools run with fixed arguments, and simulator IDs are validated as UUIDs before they reach a command line.
+- **Read-only checks stay read-only.** The protection status only asks macOS for its state; it never changes a setting.
 
 What it cannot do: on an SSD, the Shredder cannot guarantee the old blocks are physically destroyed (FileVault is the real protection there), and the Uninstaller really does delete an app's data when you ask it to.
 
 ## Command line
 
-The app binary has read-only modes that print what it would offer, without deleting anything:
-
 ```bash
 swift build
+.build/debug/MyOpenCleaner --clean                        # dry run: what would be cleaned, nothing is removed
+.build/debug/MyOpenCleaner --clean --yes                  # move the default selection to the Trash
+.build/debug/MyOpenCleaner --clean --category trash,userLogs --json   # pick categories, print JSON
+.build/debug/MyOpenCleaner --clean --help                 # all options
+```
+
+`--clean` never deletes outright: with `--yes` it moves items to the Trash (only what is already in the Trash is emptied for good), it respects your exclusions, and it exits with code 1 if anything could not be removed. The installed app works the same way: `/Applications/MyOpenCleaner.app/Contents/MacOS/MyOpenCleaner --clean`.
+
+Read-only modes print what a page would offer, without deleting anything:
+
+```bash
 .build/debug/MyOpenCleaner --scan               # system junk and launch-item threats
 .build/debug/MyOpenCleaner --dev-scan           # the Developer page
 .build/debug/MyOpenCleaner --snapshot <folder>  # render every page to PNG (shows your real data)
@@ -135,13 +146,14 @@ Nothing is written into the repository at run time. The activity log and battery
 
 ## Credits
 
-These projects were studied for ideas. No code was copied from them.
+These projects were studied for ideas. No code was copied from them; everything here was written from scratch.
 
 | Project | License | What it informed |
 |---|---|---|
 | [tw93/Mole](https://github.com/tw93/Mole) | GPL-3.0 | Which junk categories are worth cleaning |
 | [alienator88/Pearcleaner](https://github.com/alienator88/Pearcleaner) | Apache 2.0 + Commons Clause | How to match an app's leftovers by bundle ID, name and container metadata |
 | [exelban/stats](https://github.com/exelban/stats) | MIT | Reading CPU and memory statistics |
+| [momenbasel/PureMac](https://github.com/momenbasel/PureMac) | MIT | Extra developer and AI-tool cache locations, sandbox container caches, the protection status, exclusions, a real Full Disk Access check, a command-line clean |
 
 ## License
 

@@ -55,7 +55,7 @@ public struct PrivacyScanner: Sendable {
     public func scan() -> [PrivacyItem] {
         var out: [PrivacyItem] = []
         let fm = FileManager.default
-        func existing(_ urls: [URL]) -> [URL] { urls.filter { fm.fileExists(atPath: $0.path) } }
+        func existing(_ urls: [URL]) -> [URL] { urls.filter { fm.fileExists(atPath: $0.path) && !env.isExcluded($0) } }
         func add(_ owner: String, _ bid: String?, _ kind: PrivacyKind, _ urls: [URL]) {
             let f = existing(urls)
             if !f.isEmpty { out.append(PrivacyItem(owner: owner, bundleID: bid, kind: kind, files: f)) }

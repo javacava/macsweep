@@ -24,7 +24,10 @@ struct JunkView: View {
                     StateView(symbol: "checkmark.seal", title: "No junk found", message: "Your Mac is clean.")
                 } else {
                     VStack(spacing: 0) {
-                        if !result.unreadable.isEmpty { fdaBanner(result.unreadable.count) }
+                        FullDiskAccessBanner()
+                        if !result.unreadable.isEmpty, FullDiskAccess.check(env: state.env) != .denied {
+                            fdaBanner(result.unreadable.count)
+                        }
                         List {
                             ForEach(result.categories) { cat in categorySection(cat, result) }
                         }

@@ -4,6 +4,7 @@ import SweepCore
 struct MalwareView: View {
     @ObservedObject var state = AppState.shared
     @State private var threats: [Threat]?
+    @State private var checks: [SecurityCheck] = []
     @State private var selected = Set<String>()
     @State private var busy = false
     @State private var message: String?
@@ -15,6 +16,8 @@ struct MalwareView: View {
         ModulePage(module: .malware, subtitle: "Checks everything that starts automatically: known adware, miners, suspicious and broken items.") {
             Button("Scan", action: scan).disabled(busy)
         } content: {
+          VStack(spacing: 0) {
+            ProtectionStatus(checks: checks)
             if let threats {
                 if threats.isEmpty {
                     StateView(symbol: "checkmark.shield", title: "No threats found",
@@ -49,13 +52,20 @@ struct MalwareView: View {
                           busy: busy, buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
+          }
         .onAppear { if AppState.shared.autoScan, threats == nil, !busy { scan() } }
+        .task { await loadChecks() }
         .confirmationDialog("Remove \(chosen.count) items?", isPresented: $confirm) {
             Button("Stop and remove", role: .destructive, action: remove)
         } message: { Text("The processes are stopped and their launch files removed. System items need a password.") }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") {}
         } message: { Text(message ?? "") }
+    }
+
+    func loadChecks() async {
+        let env = state.env, runner = state.runner
+        checks = await AppState.background { SecurityAudit(env: env, runner: runner).run() }
     }
 
     func scan() {
@@ -132,6 +142,7 @@ struct PrivacyView: View {
         } content: {
             if let items {
                 VStack(spacing: 0) {
+                    FullDiskAccessBanner()
                     List {
                         let owners = Array(Set(items.map(\.owner))).sorted()
                         ForEach(owners, id: \.self) { owner in
@@ -212,5 +223,46 @@ struct PrivacyView: View {
             let r = await AppState.background { WiFiNetworks(runner: runner).remove(ssid) }
             if r.ok { wifi.removeAll { $0 == ssid } } else { message = "Failed: \(r.error)" }
         }
+    }
+}
+
+/// Read-only summary of the Mac's built-in protections, shown above the launch-item scan.
+struct ProtectionStatus: View {
+    let checks: [SecurityCheck]
+
+    var body: some View {
+        if !checks.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("System protection").font(.headline)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
+                    ForEach(checks) { c in
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: symbol(c.state)).foregroundStyle(color(c.state))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(c.title).font(.callout.weight(.medium))
+                                Text(c.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                if let advice = c.advice {
+                                    Text(advice).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            Spacer(minLength: 4)
+                            if c.state != .good, let link = c.settingsURL, let url = URL(string: link) {
+                                Button("Settings") { NSWorkspace.shared.open(url) }.controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20).padding(.vertical, 12)
+            .background(.quaternary.opacity(0.35))
+        }
+    }
+
+    func symbol(_ s: SecurityCheck.State) -> String {
+        switch s { case .good: "checkmark.shield.fill"; case .warning: "exclamationmark.shield.fill"; case .unknown: "questionmark.circle" }
+    }
+
+    func color(_ s: SecurityCheck.State) -> Color {
+        switch s { case .good: .green; case .warning: .orange; case .unknown: .secondary }
     }
 }
