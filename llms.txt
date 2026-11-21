@@ -3,6 +3,7 @@
 > MyOpenCleaner is a free, open-source (MIT) Mac cleaner and optimizer for macOS 14+, written in Swift and SwiftUI. It is a free alternative to CleanMyMac: it removes system junk and developer clutter, uninstalls apps with their leftovers, finds duplicates and large files, checks launch items for malware, cleans privacy traces, and shows Mac health and battery. By default removals go to the Trash and can be undone. No telemetry, no subscription.
 
 Repository: https://github.com/javacava/myopencleaner
+Website: https://javacava.github.io/myopencleaner/
 License: MIT
 Independent project, not affiliated with or endorsed by MacPaw (CleanMyMac) or Apple.
 Platform: macOS 14 Sonoma or later; build from source with Xcode or the Command Line Tools (`./build.sh --install`).

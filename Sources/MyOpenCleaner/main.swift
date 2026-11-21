@@ -91,7 +91,10 @@ enum Snapshotter {
         let wait: Double = Demo.active == nil ? 1.2 : 5
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 720),
                               styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
-        window.appearance = NSAppearance(named: .aqua)
+        // `--dark` renders in Dark Mode (used for the website); the default is light (README).
+        let dark = CommandLine.arguments.contains("--dark")
+        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        window.appearance = appearance
         window.contentView = NSHostingView(rootView: RootView().frame(width: 1100, height: 720))
         window.orderFrontRegardless()
 
@@ -103,7 +106,8 @@ enum Snapshotter {
                   let ctx = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return }
-            ctx.setFillColor(CGColor(srgbRed: 0.93, green: 0.93, blue: 0.94, alpha: 1))   // light sidebar grey
+            ctx.setFillColor(dark ? CGColor(srgbRed: 0.118, green: 0.118, blue: 0.125, alpha: 1)   // dark window grey
+                                  : CGColor(srgbRed: 0.93, green: 0.93, blue: 0.94, alpha: 1))   // light sidebar grey
             ctx.fill(CGRect(x: 0, y: 0, width: image.width, height: image.height))
             ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             guard let flat = ctx.makeImage(),
@@ -117,7 +121,7 @@ enum Snapshotter {
             // The menu bar panel, drawn on its own.
             let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 420),
                                  styleMask: [.borderless], backing: .buffered, defer: false)
-            panel.appearance = NSAppearance(named: .aqua)
+            panel.appearance = appearance
             let host = NSHostingView(rootView: MenuPanel().background(Color(nsColor: .windowBackgroundColor)))
             panel.contentView = host
             panel.setContentSize(host.fittingSize)

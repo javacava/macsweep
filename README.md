@@ -9,6 +9,8 @@
 - **Built for developers too.** Cleans Xcode, simulators, Android emulators, npm/pnpm/Yarn/pip/uv/Cargo/Go/Gradle/CocoaPods caches, project build folders (git-aware), Docker, and models of Ollama, LM Studio and Hugging Face.
 - **Tested.** 250+ automated tests run against fake Macs in temporary folders, so they never touch real files.
 
+**Website:** https://javacava.github.io/myopencleaner/
+
 ![MyOpenCleaner Quick Scan: one scan for junk, threats, app leftovers and maintenance](docs/screenshots/quick-scan.png)
 
 ## Who it is for
