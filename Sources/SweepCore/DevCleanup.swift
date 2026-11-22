@@ -85,8 +85,11 @@ public struct DevItem: Identifiable, Hashable, Sendable {
     public var lastUsed: Date? = nil
     /// Set when the item differs from its group's usual safety (an archive among Xcode caches, the version in use…).
     public var safetyOverride: Safety? = nil
+    /// The tool, app or project the item belongs to ("npm", "Ollama", "my-app"), for the Storage page.
+    public var tool: String? = nil
 
     public var safety: Safety { safetyOverride ?? group.safety }
+    public var owner: String { tool ?? group.title }
     /// Kept items are shown but can never be selected or removed.
     public var isRemovable: Bool { safety != .kept }
 }
@@ -251,7 +254,7 @@ public struct DevFolderScanner: Sendable {
                 guard size > 0 else { continue }
                 out.append(DevItem(id: dir.path, group: rule.group, title: rule.title, detail: env.displayPath(dir),
                                    size: size, removal: .files([dir]), selectedByDefault: rule.selected, location: dir,
-                                   safetyOverride: rule.safety))
+                                   safetyOverride: rule.safety, tool: rule.tool))
             case .children:
                 for child in fm.children(of: dir) where !child.lastPathComponent.hasPrefix(".") && !env.isExcluded(child) {
                     let size = FileSize.of(child)
@@ -259,7 +262,7 @@ public struct DevFolderScanner: Sendable {
                     out.append(DevItem(id: child.path, group: rule.group, title: child.lastPathComponent,
                                        detail: rule.title, size: size, removal: .files([child]),
                                        selectedByDefault: rule.selected, location: child, lastUsed: child.modificationDate,
-                                       safetyOverride: rule.safety))
+                                       safetyOverride: rule.safety, tool: rule.tool))
                 }
             }
         }
@@ -291,11 +294,12 @@ public struct DevFolderScanner: Sendable {
             if name == current || name == newest {
                 return DevItem(id: v.path, group: .oldVersions, title: "Claude Code \(name)",
                                detail: name == current ? "In use" : "Newest version", size: size, removal: .files([v]),
-                               location: v, lastUsed: v.modificationDate, safetyOverride: .kept)
+                               location: v, lastUsed: v.modificationDate, safetyOverride: .kept, tool: "Claude Code")
             }
             return DevItem(id: v.path, group: .oldVersions, title: "Claude Code \(name)",
                            detail: "Older version · in use: \(current ?? newest ?? "?")", size: size,
-                           removal: .files([v]), selectedByDefault: true, location: v, lastUsed: v.modificationDate)
+                           removal: .files([v]), selectedByDefault: true, location: v, lastUsed: v.modificationDate,
+                           tool: "Claude Code")
         }
     }
 
@@ -306,7 +310,7 @@ public struct DevFolderScanner: Sendable {
         let size = FileSize.of(dir)
         guard size > 0 else { return [] }
         return [DevItem(id: dir.path, group: .packageCaches, title: "Bazel (output base)", detail: env.displayPath(dir),
-                        size: size, removal: .files([dir]), selectedByDefault: false, location: dir)]
+                        size: size, removal: .files([dir]), selectedByDefault: false, location: dir, tool: "Bazel")]
     }
 
     /// Java heap dumps (`*.hprof`) in the home folder, a few levels deep, outside ~/Library.
@@ -322,7 +326,8 @@ public struct DevFolderScanner: Sendable {
             guard size > 0 else { continue }
             out.append(DevItem(id: url.path, group: .heapDumps, title: url.lastPathComponent,
                                detail: env.displayPath(url.deletingLastPathComponent()), size: size,
-                               removal: .files([url]), selectedByDefault: true, location: url, lastUsed: url.modificationDate))
+                               removal: .files([url]), selectedByDefault: true, location: url, lastUsed: url.modificationDate,
+                               tool: "Java"))
         }
         return out
     }
@@ -337,7 +342,7 @@ public struct DevFolderScanner: Sendable {
             let files = [avd] + (fm.fileExists(atPath: ini.path) ? [ini] : [])
             out.append(DevItem(id: avd.path, group: .android, title: avd.deletingPathExtension().lastPathComponent,
                                detail: "Virtual device", size: FileSize.of(avd), removal: .files(files),
-                               location: avd, lastUsed: avd.modificationDate))
+                               location: avd, lastUsed: avd.modificationDate, tool: "Android Studio"))
         }
         // system-images/<api>/<tag>/<abi>
         let images = env.resolve("~/Library/Android/sdk/system-images")
@@ -348,7 +353,8 @@ public struct DevFolderScanner: Sendable {
                     guard size > 0 else { continue }
                     out.append(DevItem(id: abi.path, group: .android,
                                        title: "\(api.lastPathComponent) · \(tag.lastPathComponent) · \(abi.lastPathComponent)",
-                                       detail: "System image", size: size, removal: .files([abi]), location: abi, safetyOverride: .safe))
+                                       detail: "System image", size: size, removal: .files([abi]), location: abi, safetyOverride: .safe,
+                                       tool: "Android Studio"))
                 }
             }
         }
@@ -395,7 +401,7 @@ public struct AIModelScanner: Sendable {
                 let title = nested ? model.deletingLastPathComponent().lastPathComponent + "/" + model.lastPathComponent
                                    : model.lastPathComponent
                 out.append(DevItem(id: model.path, group: .aiModels, title: title, detail: app, size: size,
-                                   removal: .files([model]), location: model, lastUsed: model.accessDate))
+                                   removal: .files([model]), location: model, lastUsed: model.accessDate, tool: app))
             }
         }
         return out.sorted { $0.size > $1.size }
@@ -413,7 +419,7 @@ public struct AIModelScanner: Sendable {
             let title = name.split(separator: "-", omittingEmptySubsequences: true).isEmpty ? name
                 : name.components(separatedBy: "--").dropFirst().joined(separator: "/")
             return DevItem(id: dir.path, group: .aiModels, title: title, detail: kind, size: size,
-                           removal: .files([dir]), location: dir, lastUsed: dir.modificationDate)
+                           removal: .files([dir]), location: dir, lastUsed: dir.modificationDate, tool: "Hugging Face")
         }
     }
 
@@ -447,7 +453,7 @@ public struct AIModelScanner: Sendable {
             let shared = size - freed
             let detail = "Ollama" + (shared > 0 ? " · \(FileSize.format(shared)) shared with other models stays" : "")
             return DevItem(id: m.url.path, group: .aiModels, title: m.name, detail: detail, size: freed,
-                           removal: .files([m.url] + own), location: m.url, lastUsed: m.url.modificationDate)
+                           removal: .files([m.url] + own), location: m.url, lastUsed: m.url.modificationDate, tool: "Ollama")
         }
     }
 
@@ -485,7 +491,7 @@ public struct SimulatorScanner: Sendable {
         let size = FileSize.of(env.resolve(Self.metalAsset))
         return [DevItem(id: "metal-toolchain", group: .oldVersions, title: "Metal Toolchain",
                         detail: "Xcode component · needed only to compile Metal shaders; Xcode downloads it again on demand",
-                        size: size, removal: .command([Self.xcodebuild, "-deleteComponent", "metaltoolchain"]))]
+                        size: size, removal: .command([Self.xcodebuild, "-deleteComponent", "metaltoolchain"]), tool: "Xcode")]
     }
 
     /// `xcodebuild -showComponent` prints "Status: installed" or "Status: uninstalled".
@@ -541,7 +547,7 @@ public struct SimulatorScanner: Sendable {
                 out.append(DevItem(id: "sim-" + udid, group: .simulators, title: name, detail: detail, size: size,
                                    removal: .command([xcrun, "simctl", "delete", udid]),
                                    selectedByDefault: !available && !booted, location: dataPath, lastUsed: used,
-                                   safetyOverride: safety))
+                                   safetyOverride: safety, tool: "Xcode"))
             }
         }
         return out.sorted { $0.size > $1.size }
@@ -569,7 +575,7 @@ public struct SimulatorScanner: Sendable {
             if used == nil { detail += " · never used" }
             out.append(DevItem(id: "runtime-" + id, group: .runtimes, title: name, detail: detail,
                                size: (r["sizeBytes"] as? NSNumber)?.int64Value ?? 0,
-                               removal: .command([xcrun, "simctl", "runtime", "delete", id]), lastUsed: used))
+                               removal: .command([xcrun, "simctl", "runtime", "delete", id]), lastUsed: used, tool: "Xcode"))
         }
         return out.sorted { $0.size > $1.size }
     }
@@ -717,7 +723,8 @@ public struct BuildArtifactFinder: Sendable {
                 let days = activity.map { Int(env.now().timeIntervalSince($0) / 86_400) }
                 out.append(DevItem(id: child.path, group: .builds, title: "\(dir.lastPathComponent)/\(name)",
                                    detail: kind.title + " · " + env.displayPath(dir) + (days.map { " · unchanged for \($0) days" } ?? ""),
-                                   size: size, removal: .files([child]), location: child, lastUsed: activity))
+                                   size: size, removal: .files([child]), location: child, lastUsed: activity,
+                                   tool: dir.lastPathComponent))
                 continue
             }
             if name.hasPrefix(".") || Self.packageExtensions.contains(child.pathExtension.lowercased()) { continue }

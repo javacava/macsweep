@@ -2,7 +2,7 @@ import SwiftUI
 import SweepCore
 
 enum Module: String, CaseIterable, Identifiable, Hashable {
-    case quickScan, junk, developer, cloud, malware, privacy, shredder, maintenance, launchItems
+    case quickScan, storage, junk, developer, cloud, malware, privacy, shredder, maintenance, launchItems
     case uninstaller, updater, leftovers, largeOld, duplicates, similar, spaceMap, monitor, battery
 
     var id: String { rawValue }
@@ -10,6 +10,7 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .quickScan: "Quick Scan"
+        case .storage: "Storage"
         case .junk: "System Junk"
         case .developer: "Developer"
         case .cloud: "Cloud Files"
@@ -33,6 +34,7 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
     var symbol: String {
         switch self {
         case .quickScan: "sparkles"
+        case .storage: "chart.pie"
         case .junk: "trash.circle"
         case .developer: "hammer"
         case .cloud: "icloud"
@@ -56,6 +58,7 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
     var tint: Color {
         switch self {
         case .quickScan: .purple
+        case .storage: .indigo
         case .junk, .developer, .cloud: .green
         case .malware, .privacy, .shredder: .red
         case .maintenance, .launchItems: .orange
@@ -67,7 +70,7 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
     }
 
     static let sections: [(String, [Module])] = [
-        ("", [.quickScan]),
+        ("", [.quickScan, .storage]),
         ("Cleanup", [.junk, .developer, .cloud]),
         ("Protection", [.malware, .privacy, .shredder]),
         ("Performance", [.maintenance, .launchItems, .monitor, .battery]),

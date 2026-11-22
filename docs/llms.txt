@@ -23,6 +23,7 @@ Platform: macOS 14 Sonoma or later, Apple silicon and Intel. Download: https://g
 ## Features
 
 - Quick Scan: one scan for junk, threats, leftovers and maintenance.
+- Storage: everything System Junk and Developer find, as an interactive 3D disc by area (AI, developer tools, projects, apps, macOS) and by the tool, app or project that made it, with a rim showing how much is Safe, Check first or Kept.
 - System Junk: caches, logs, browser caches, chat and work app caches (Slack, Discord, Teams, Notion, Figma…), sandbox container caches, Mail attachments, Trash, iOS backups, incomplete downloads, old installers.
 - Developer: simulators and runtimes, Xcode data, Metal toolchain, Android emulators, package and IDE caches, old Claude Code versions, language versions (the default stays), AI tool and coding agent caches, AI models one by one, VM and container disks (shown, never removed), Java heap dumps, git-aware project build folders, Docker prune.
 - Cloud Files: keep large iCloud Drive files in the cloud only.

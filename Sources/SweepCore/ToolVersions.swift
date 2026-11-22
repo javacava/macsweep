@@ -78,7 +78,7 @@ public struct ToolVersionScanner: Sendable {
             let why = source.defaults.isEmpty ? "newest" : "default"
             return DevItem(id: v.path, group: .toolVersions, title: "\(source.runtime) \(name)",
                            detail: source.manager + (isKept ? " · \(why) version" : ""), size: size, removal: .files([v]),
-                           location: v, lastUsed: v.modificationDate, safetyOverride: isKept ? .kept : nil)
+                           location: v, lastUsed: v.modificationDate, safetyOverride: isKept ? .kept : nil, tool: source.manager)
         }
     }
 
@@ -150,7 +150,7 @@ public struct VirtualMachineDisks: Sendable {
             let size = FileSize.of(url)
             guard size > 0 else { continue }
             out.append(DevItem(id: url.path, group: .virtualMachines, title: d.tool, detail: "Kept · " + d.how,
-                               size: size, removal: .files([url]), location: url, safetyOverride: .kept))
+                               size: size, removal: .files([url]), location: url, safetyOverride: .kept, tool: d.tool))
         }
         // Lima: one folder per instance; folders starting with "_" are its own config and cache.
         for vm in FileManager.default.children(of: env.resolve("~/.lima")) where vm.isDirectoryURL
@@ -159,7 +159,7 @@ public struct VirtualMachineDisks: Sendable {
             guard size > 0 else { continue }
             out.append(DevItem(id: vm.path, group: .virtualMachines, title: "Lima · \(vm.lastPathComponent)",
                                detail: "Kept · remove it with `limactl delete \(vm.lastPathComponent)`", size: size,
-                               removal: .files([vm]), location: vm, safetyOverride: .kept))
+                               removal: .files([vm]), location: vm, safetyOverride: .kept, tool: "Lima"))
         }
         return out
     }

@@ -7,11 +7,16 @@
 - **Native and small.** One 6 MB SwiftUI app. No Electron, no background daemon, no helper installed as root.
 - **Safe by design.** One safety guard checks every deletion; system folders, Keychains, the Photos library and your exclusions can never be removed. By default removals go to the Trash and can be put back with Undo.
 - **Built for developers too.** Cleans Xcode, simulators, Android emulators, npm/pnpm/Yarn/pip/uv/Cargo/Go/Gradle/CocoaPods caches, project build folders (git-aware), Docker, language versions (pyenv, nvm, fnm, rbenv, asdf, mise), logs of AI coding agents, and models of Ollama, LM Studio, Hugging Face and ComfyUI. [150+ supported tools](https://javacava.github.io/myopencleaner/tools/).
+- **See where your space goes.** The Storage page draws everything it can clean as a 3D disc: areas inside, the tools, apps and projects that made the files around them, and a rim that shows how much is safe. Point at a slice and it lifts; click it to see its files.
 - **A safety mark on every row.** *Safe* comes back by itself, *Check first* may hold your work and is never selected for you, *Kept* is shown so the space adds up and never removed.
 - **Works with your AI agent.** A read-only MCP server lets Claude Code, Claude Desktop, Codex or Cursor read the scan and suggest a cleanup.
 - **Tested.** 280+ automated tests run against fake Macs in temporary folders, so they never touch real files.
 
 **Website:** https://javacava.github.io/myopencleaner/ · **[Supported tools](https://javacava.github.io/myopencleaner/tools/)** · **Guides:** [Clear System Data on a Mac](https://javacava.github.io/myopencleaner/guides/clear-system-data-mac/) · [Free up space from Xcode](https://javacava.github.io/myopencleaner/guides/free-up-xcode-space/) · [Free CleanMyMac alternatives](https://javacava.github.io/myopencleaner/guides/free-cleanmymac-alternatives/)
+
+![MyOpenCleaner Storage page: a 3D disc of everything that can be cleaned, by area and by tool; slices lift as the pointer moves over them](docs/assets/video/storage.gif)
+
+▶ [Watch the 20-second tour](https://javacava.github.io/myopencleaner/#tour) · the video and the GIF are recorded from a made-up demo Mac with `--record`.
 
 ![MyOpenCleaner Quick Scan: one scan for junk, threats, app leftovers and maintenance](docs/screenshots/quick-scan.png)
 
@@ -89,6 +94,7 @@ git push origin v1.0.0
 
 | Page | What it does |
 |---|---|
+| **Storage** | Everything System Junk and Developer find, in one 3D disc: AI, developer tools, projects, apps and macOS inside; each tool, app or project around them; a rim split into Safe, Check first and Kept. Slices lift under the pointer, a click opens the list of files with their marks, and nothing is counted twice. |
 | **Quick Scan** | One scan across junk, threats, app leftovers and maintenance. Asks before cleaning and never needs a password. |
 | **System Junk** | User and system caches, logs, browser caches, Chromium caches of chat and work apps (Slack, Discord, Teams, Signal, Notion, Figma, Linear, Postman, Claude…), caches inside sandboxed app containers, Xcode junk, package manager caches, Mail attachments older than 30 days, Trash, iOS backups, incomplete downloads, old installers. |
 | **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData, Xcode archives and XCTest devices, the optional Metal toolchain, Android emulators; package caches for npm/npx/Yarn/pnpm/Bun/uv/pip/Poetry/Conda/Deno/CocoaPods/SwiftPM/Gradle/Cargo/Go/NuGet/Ruby gems/Composer/Bazel/Puppeteer; caches of VS Code and its relatives (Cursor, Windsurf, Antigravity, Kiro, Trae, VSCodium) and JetBrains; ccache, sccache, Coursier, cabal, GHCup, Julia, minikube, Helm, Unity, Foundry and Solana caches; older Claude Code versions (the one in use and the newest are listed as kept); language versions installed by pyenv, rbenv, nvm, fnm, asdf and mise (the default version is kept); Java heap dumps; logs and caches of local AI tools and coding agents (Claude Code, Codex, Gemini CLI, opencode, Aider; conversation history only as *Check first*); downloaded AI models (Ollama, LM Studio, Hugging Face, ComfyUI, GPT4All, Jan, Draw Things, Whisper, kagglehub…, one row per model, never preselected; Ollama layers shared by other models are kept); disks of Docker Desktop, OrbStack, Colima, Lima and Podman (shown with the command that shrinks them, never removed); project builds for Node, Swift, Rust, Python, Gradle, CocoaPods, Dart, Unity, Unreal, Godot, .NET, Terraform, Zig, Elixir and Haskell; Docker build cache, images, containers and volumes. |
@@ -210,9 +216,12 @@ Read-only modes print what a page would offer, without deleting anything:
 .build/debug/MyOpenCleaner --list-tools         # the apps and tools MyOpenCleaner knows
 .build/debug/MyOpenCleaner --snapshot <folder>  # render every page to PNG (shows your real data)
 .build/debug/MyOpenCleaner --snapshot <folder> --demo  # the same for a made-up Mac; safe to publish
+.build/release/MyOpenCleaner --record tour.mp4 --demo --dark  # a 20-second video tour of the made-up Mac
 ```
 
 `--demo` builds a fake home folder full of invented apps, junk, projects and photos in a temporary directory, answers every external tool (`simctl`, `docker`, `ps`, `networksetup`…) with canned output instead of running it, and deletes the fake Mac when it is done. File icons are replaced with neutral symbols so the screenshots do not reveal which apps are installed on the machine that renders them. The images in `docs/screenshots` were made this way.
+
+`--record` plays a scripted tour of the demo Mac in a transparent window behind everything else and writes it to an MP4, frame by frame on a clock of its own, so the video is smooth and the Mac stays usable while it records. It only works together with `--demo`. `docs/assets/video` holds the result, shrunk with `ffmpeg`.
 
 ## AI agents (MCP)
 

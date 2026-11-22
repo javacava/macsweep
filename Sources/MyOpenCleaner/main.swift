@@ -117,6 +117,13 @@ if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLi
     MainActor.assumeIsolated { Snapshotter.run(into: dir) }
 }
 
+// `MyOpenCleaner --record <file.mp4> --demo [--dark]`: a short video tour of the demo Mac, made off screen.
+if let i = CommandLine.arguments.firstIndex(of: "--record"), i + 1 < CommandLine.arguments.count {
+    guard CommandLine.arguments.contains("--demo") else { print("--record needs --demo: videos only ever show the made-up Mac"); exit(2) }
+    do { Demo.active = try DemoMac() } catch { print("Could not build the demo Mac: \(error)"); exit(1) }
+    MainActor.assumeIsolated { Recorder.run(to: URL(fileURLWithPath: CommandLine.arguments[i + 1])) }
+}
+
 MyOpenCleanerApp.main()
 
 @MainActor
@@ -252,6 +259,7 @@ struct RootView: View {
     @ViewBuilder var detail: some View {
             switch state.selection ?? .quickScan {
             case .quickScan: QuickScanView()
+            case .storage: StorageView()
             case .junk: JunkView()
             case .developer: DeveloperView()
             case .cloud: CloudView()
