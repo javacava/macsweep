@@ -22,6 +22,10 @@ on:
 
 permissions:
   contents: write
+  # Signed build provenance: GitHub records which commit and workflow made each file, so anyone
+  # can check a download with `gh attestation verify <file> -R javacava/myopencleaner`.
+  id-token: write
+  attestations: write
 
 concurrency:
   group: release-${{ github.ref }}-${{ inputs.add_dmg_to }}
@@ -84,6 +88,14 @@ jobs:
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
           echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
 
+      - name: Attest build provenance
+        if: github.ref_type == 'tag'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            ${{ steps.package.outputs.dmg }}
+            ${{ steps.package.outputs.zip }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: MyOpenCleaner-${{ steps.version.outputs.version }}
@@ -141,6 +153,12 @@ jobs:
           shasum -a 256 "$DMG" > "$DMG.sha256"
           cat "$DMG.sha256"
           echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
+
+      # Only the DMG: it is made in this run. The zip was built by the tag's own run.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ steps.package.outputs.dmg }}
 
       - name: Add it to the release
         env:

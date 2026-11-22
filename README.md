@@ -52,6 +52,12 @@ Prefer Terminal? `xattr -dr com.apple.quarantine /Applications/MyOpenCleaner.app
 
 Releases are built from the tagged source by [GitHub Actions](.github/workflows/release.yml), not on anyone's personal Mac, and every release lists the SHA-256 of its files. The app is signed ad hoc, without a developer certificate.
 
+GitHub also signs a record of which commit and workflow produced each download ([build provenance](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)). With the [GitHub CLI](https://cli.github.com) you can check that a file came from this repository's release workflow and was not swapped by hand:
+
+```bash
+gh attestation verify MyOpenCleaner-1.0.0.dmg -R javacava/myopencleaner
+```
+
 ### Build from source
 
 ```bash

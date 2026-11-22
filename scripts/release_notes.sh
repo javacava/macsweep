@@ -30,5 +30,15 @@ $(cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")")
 $(cd "$(dirname "$ZIP")" && shasum -a 256 "$(basename "$ZIP")")
 \`\`\`
 
+### Check that GitHub made it
+
+GitHub signs a record of which commit and workflow produced the disk image. To check your download, with the [GitHub CLI](https://cli.github.com):
+
+\`\`\`
+gh attestation verify $(basename "$DMG") -R ${GITHUB_REPOSITORY}
+\`\`\`
+
+It fails for any file that was not made by this repository's release workflow.
+
 EOF
 gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="$TAG" -q .body
