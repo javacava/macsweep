@@ -57,8 +57,10 @@ import Testing
         // The user pinned an older version on purpose.
         try FileManager.default.createSymbolicLink(atPath: s.env.resolve("~/.local/bin/claude").path,
                                                    withDestinationPath: s.env.resolve("~/.local/share/claude/versions/2.1.200").path)
-        let titles = Set(DevFolderScanner(env: s.env).oldClaudeCodeVersions().map(\.title))
-        #expect(titles == ["Claude Code 2.0.9", "Claude Code 2.1.40"])
+        let items = DevFolderScanner(env: s.env).oldClaudeCodeVersions()
+        #expect(Set(items.filter(\.isRemovable).map(\.title)) == ["Claude Code 2.0.9", "Claude Code 2.1.40"])
+        #expect(Set(items.filter { !$0.isRemovable }.map(\.title)) == ["Claude Code 2.1.200", "Claude Code 2.1.310"],
+                "in use and newest are listed as kept")
     }
 
     @Test func singleVersionIsNeverOffered() {
@@ -71,8 +73,13 @@ import Testing
         let s = Sandbox()
         s.file("~/.claude/projects/p/session.jsonl", bytes: 5000)
         s.file("~/.claude/settings.json", bytes: 5000)
+        s.file("~/.claude/debug/log.txt", bytes: 5000)
+        // Only debug logs and shell snapshots may go; conversations, memory and settings never.
+        let allowed = ["/.claude/debug", "/.claude/shell-snapshots"]
         #expect(!DevFolderScanner(env: s.env).scan().contains { item in
-            if case .files(let urls) = item.removal { return urls.contains { $0.path.contains("/.claude/") } }
+            if case .files(let urls) = item.removal {
+                return urls.contains { u in u.path.contains("/.claude/") && !allowed.contains { u.path.hasSuffix($0) } }
+            }
             return false
         })
     }

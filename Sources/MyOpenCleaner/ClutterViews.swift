@@ -218,7 +218,7 @@ struct SimilarView: View {
     }
 
     var body: some View {
-        ModulePage(module: .similar, subtitle: "Similar photos: bursts, retakes, resized copies. The pictures are compared, not the files.") {
+        ModulePage(module: .similar, subtitle: "Similar photos and videos: bursts, retakes, resized copies, re-exports and AI takes. The pictures are compared, not the files.") {
             Button(folder.map { "Folder: \($0.lastPathComponent)" } ?? "Choose folder…") {
                 let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false
                 if p.runModal() == .OK { folder = p.url }
@@ -226,7 +226,7 @@ struct SimilarView: View {
             Button("Scan", action: scan).disabled(busy)
         } content: {
             if let groups {
-                if groups.isEmpty { StateView(symbol: "checkmark.seal", title: "No similar photos found") } else {
+                if groups.isEmpty { StateView(symbol: "checkmark.seal", title: "No similar photos or videos found") } else {
                     VStack(spacing: 0) {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 18) {
@@ -240,20 +240,20 @@ struct SimilarView: View {
                             }
                             .padding()
                         }
-                        Text("Similarity is a guess and can be wrong. Look at the photos before removing any.")
+                        Text("Similarity is a guess and can be wrong. Look at the photos and videos before removing any.")
                             .font(.caption).foregroundStyle(.secondary).padding(.top, 4)
                         ActionBar(selectedCount: chosen.count, selectedSize: chosen.reduce(0) { $0 + $1.size },
                                   buttonTitle: "Remove", busy: busy) { askConfirm() }
                     }
                 }
             } else {
-                StateView(symbol: "photo.on.rectangle", title: busy ? "Analyzing images…" : "Find similar photos",
-                          message: "By default, your Pictures, Downloads and Desktop folders.", busy: busy,
+                StateView(symbol: "photo.on.rectangle", title: busy ? "Analyzing photos and videos…" : "Find similar photos and videos",
+                          message: "By default, your Pictures, Movies, Downloads and Desktop folders. Videos are compared by length and three frames.", busy: busy,
                           buttonTitle: busy ? nil : "Scan", action: scan)
             }
         }
         .onAppear { if AppState.shared.autoScan, groups == nil, !busy { scan() } }
-        .confirmationDialog("Remove \(chosen.count) photos?", isPresented: $confirm) {
+        .confirmationDialog("Remove \(chosen.count) files?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
         } message: { if let inUse { Text(inUse) } }
         .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
@@ -274,11 +274,12 @@ struct SimilarView: View {
     func scan() {
         busy = true; groups = nil
         let env = state.env
-        let roots = folder.map { [$0] } ?? ["~/Pictures", "~/Downloads", "~/Desktop"].map(env.resolve)
+        let roots = folder.map { [$0] } ?? ["~/Pictures", "~/Movies", "~/Downloads", "~/Desktop"].map(env.resolve)
         Task {
             let g = await AppState.background {
-                let files = roots.flatMap { FileWalker().files(under: $0, minSize: 20_000) }.filter { $0.kind == .image }
-                return SimilarImages.groups(files)
+                let files = roots.flatMap { FileWalker().files(under: $0, minSize: 20_000) }
+                return SimilarImages.groups(files.filter { $0.kind == .image })
+                    + SimilarVideos.groups(files.filter { $0.kind == .video && $0.size >= 100_000 })
             }
             groups = g
             selected = []   // "similar" is a guess: the user picks what goes
@@ -307,10 +308,16 @@ struct AsyncThumb: View {
         ZStack {
             Rectangle().fill(.quaternary)
             if let image { Image(nsImage: image).resizable().scaledToFill() }
+            if FileKind.of(url) == .video {
+                Image(systemName: "play.circle.fill").font(.title).foregroundStyle(.white.opacity(0.9)).shadow(radius: 3)
+            }
         }
         .task {
             let u = url
             let data = await AppState.background { () -> Data? in
+                if FileKind.of(u) == .video {
+                    return SimilarVideos.poster(u).flatMap { NSBitmapImageRep(cgImage: $0).representation(using: .png, properties: [:]) }
+                }
                 guard let src = CGImageSourceCreateWithURL(u as CFURL, nil),
                       let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                                                            kCGImageSourceThumbnailMaxPixelSize: 300,

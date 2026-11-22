@@ -8,6 +8,7 @@ final class MonitorModel: ObservableObject {
 
     @Published var cpu: Double = 0
     @Published var memory: MemoryStats?
+    @Published var swap: SwapStats?
     @Published var disk: DiskStats?
     @Published var downPerSec: Double = 0
     @Published var upPerSec: Double = 0
@@ -22,7 +23,7 @@ final class MonitorModel: ObservableObject {
     func start() {
         if let demo = Demo.active {
             // Screenshot mode: fixed figures, no polling of the real Mac.
-            cpu = 0.31; memory = demo.memory; disk = demo.disk; downPerSec = 2_400_000; upPerSec = 310_000
+            cpu = 0.31; memory = demo.memory; swap = demo.swap; disk = demo.disk; downPerSec = 2_400_000; upPerSec = 310_000
             cpuHistory = demo.cpuHistory
             let all = SystemMonitor.parseProcesses(demo.runner.run("/bin/ps", []).output)
             topCPU = Array(all.sorted { $0.cpu > $1.cpu }.prefix(5))
@@ -42,6 +43,7 @@ final class MonitorModel: ObservableObject {
             if cpuHistory.count > 60 { cpuHistory.removeFirst() }
         }
         memory = SystemMonitor.memory()
+        swap = SystemMonitor.swap()
         disk = SystemMonitor.disk()
         let net = SystemMonitor.network(), now = Date()
         if let (prev, at) = lastNet, now > at, net.received >= prev.received, net.sent >= prev.sent {
@@ -96,6 +98,7 @@ struct MonitorView: View {
                         .font(.callout.monospacedDigit())
                     }
                     Sparkline(values: m.cpuHistory).frame(height: 60)
+                    if let mem = m.memory { MemoryBreakdown(memory: mem, swap: m.swap) }
                     HStack(alignment: .top, spacing: 30) {
                         ProcessTable(title: "Top CPU", rows: m.topCPU, value: { String(format: "%.1f%%", $0.cpu) })
                         ProcessTable(title: "Top memory", rows: m.topMemory, value: { FileSize.format(Int64($0.memoryBytes)) })
@@ -316,6 +319,57 @@ struct CleanHistoryList: View {
             }
             .id(state.activityVersion)
             .padding(.bottom, 10)
+        }
+    }
+}
+
+/// Where the memory goes, as one bar, and how much has spilled to the swap file on disk.
+struct MemoryBreakdown: View {
+    let memory: MemoryStats
+    let swap: SwapStats?
+
+    var parts: [(label: String, bytes: UInt64, color: Color, help: String)] {
+        [("Apps", memory.appMemory, .blue, "Memory your apps are using"),
+         ("Wired", memory.wired, .purple, "Memory macOS itself needs and cannot move"),
+         ("Compressed", memory.compressed, .orange, "Memory squeezed in place to avoid swapping"),
+         ("Cached files", memory.purgeable + memory.external, .teal, "Recently read files, dropped first when memory is needed")]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Memory").font(.headline)
+            GeometryReader { geo in
+                HStack(spacing: 2) {
+                    ForEach(parts, id: \.label) { p in
+                        Rectangle().fill(p.color.gradient)
+                            .frame(width: max(geo.size.width * CGFloat(p.bytes) / CGFloat(max(memory.total, 1)) - 2, 0))
+                            .help("\(p.label): \(FileSize.format(Int64(p.bytes))) · \(p.help)")
+                    }
+                    Spacer(minLength: 0)
+                }
+                .background(Color.secondary.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+            }
+            .frame(height: 14)
+            HStack(spacing: 16) {
+                ForEach(parts, id: \.label) { p in
+                    HStack(spacing: 5) {
+                        Circle().fill(p.color).frame(width: 8, height: 8)
+                        Text("\(p.label) \(FileSize.format(Int64(p.bytes)))").font(.caption.monospacedDigit())
+                    }
+                    .help(p.help)
+                }
+                Spacer()
+                Text("of \(FileSize.format(Int64(memory.total)))").font(.caption).foregroundStyle(.secondary)
+            }
+            if let swap {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Label("Swap \(FileSize.format(Int64(swap.used)))", systemImage: "arrow.left.arrow.right.square")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(Double(swap.used) / Double(max(memory.total, 1)) >= 0.1 ? .orange : .primary)
+                    Text(swap.advice(physicalMemory: memory.total)).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 }

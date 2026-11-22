@@ -41,7 +41,7 @@ import Testing
     }
 
     @Test func releaseScriptsAreValidShell() throws {
-        for script in ["build.sh", "scripts/make_dmg.sh", "scripts/release_notes.sh"] {
+        for script in ["build.sh", "scripts/make_dmg.sh", "scripts/release_notes.sh", "scripts/update_tools_page.sh"] {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/bash")
             p.arguments = ["-n", Self.repo.appendingPathComponent(script).path]

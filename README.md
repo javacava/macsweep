@@ -6,10 +6,12 @@
 - **Private.** No telemetry, no analytics. The only network request is the optional "Check for updates" of your Sparkle-based apps, and only when you press it.
 - **Native and small.** One 6 MB SwiftUI app. No Electron, no background daemon, no helper installed as root.
 - **Safe by design.** One safety guard checks every deletion; system folders, Keychains, the Photos library and your exclusions can never be removed. By default removals go to the Trash and can be put back with Undo.
-- **Built for developers too.** Cleans Xcode, simulators, Android emulators, npm/pnpm/Yarn/pip/uv/Cargo/Go/Gradle/CocoaPods caches, project build folders (git-aware), Docker, and models of Ollama, LM Studio and Hugging Face.
-- **Tested.** 250+ automated tests run against fake Macs in temporary folders, so they never touch real files.
+- **Built for developers too.** Cleans Xcode, simulators, Android emulators, npm/pnpm/Yarn/pip/uv/Cargo/Go/Gradle/CocoaPods caches, project build folders (git-aware), Docker, language versions (pyenv, nvm, fnm, rbenv, asdf, mise), logs of AI coding agents, and models of Ollama, LM Studio, Hugging Face and ComfyUI. [150+ supported tools](https://javacava.github.io/myopencleaner/tools/).
+- **A safety mark on every row.** *Safe* comes back by itself, *Check first* may hold your work and is never selected for you, *Kept* is shown so the space adds up and never removed.
+- **Works with your AI agent.** A read-only MCP server lets Claude Code, Claude Desktop, Codex or Cursor read the scan and suggest a cleanup.
+- **Tested.** 280+ automated tests run against fake Macs in temporary folders, so they never touch real files.
 
-**Website:** https://javacava.github.io/myopencleaner/ · **Guides:** [Clear System Data on a Mac](https://javacava.github.io/myopencleaner/guides/clear-system-data-mac/) · [Free up space from Xcode](https://javacava.github.io/myopencleaner/guides/free-up-xcode-space/) · [Free CleanMyMac alternatives](https://javacava.github.io/myopencleaner/guides/free-cleanmymac-alternatives/)
+**Website:** https://javacava.github.io/myopencleaner/ · **[Supported tools](https://javacava.github.io/myopencleaner/tools/)** · **Guides:** [Clear System Data on a Mac](https://javacava.github.io/myopencleaner/guides/clear-system-data-mac/) · [Free up space from Xcode](https://javacava.github.io/myopencleaner/guides/free-up-xcode-space/) · [Free CleanMyMac alternatives](https://javacava.github.io/myopencleaner/guides/free-cleanmymac-alternatives/)
 
 ![MyOpenCleaner Quick Scan: one scan for junk, threats, app leftovers and maintenance](docs/screenshots/quick-scan.png)
 
@@ -88,8 +90,8 @@ git push origin v1.0.0
 | Page | What it does |
 |---|---|
 | **Quick Scan** | One scan across junk, threats, app leftovers and maintenance. Asks before cleaning and never needs a password. |
-| **System Junk** | User and system caches, logs, browser caches, caches inside sandboxed app containers, Xcode junk, package manager caches, Mail attachments older than 30 days, Trash, iOS backups, incomplete downloads, old installers. |
-| **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData, Xcode archives and XCTest devices, the optional Metal toolchain, Android emulators; package caches for npm/npx/Yarn/pnpm/Bun/uv/pip/Poetry/Conda/Deno/CocoaPods/SwiftPM/Gradle/Cargo/Go/NuGet/Ruby gems/Composer/Bazel/Puppeteer; VS Code, Cursor and JetBrains caches; older Claude Code versions (never the one in use); Java heap dumps; logs and caches of local AI tools; downloaded AI models (Ollama, LM Studio, Hugging Face, GPT4All, Jan, Draw Things, Whisper…, one row per model, never preselected; Ollama layers shared by other models are kept); project builds for Node, Swift, Rust, Python, Gradle, CocoaPods, Dart, Unity, Unreal, Godot, .NET, Terraform, Zig, Elixir and Haskell; Docker build cache, images, containers and volumes. |
+| **System Junk** | User and system caches, logs, browser caches, Chromium caches of chat and work apps (Slack, Discord, Teams, Signal, Notion, Figma, Linear, Postman, Claude…), caches inside sandboxed app containers, Xcode junk, package manager caches, Mail attachments older than 30 days, Trash, iOS backups, incomplete downloads, old installers. |
+| **Developer** | iOS simulators and simulator runtimes, IPSW firmware and device symbols, DerivedData, Xcode archives and XCTest devices, the optional Metal toolchain, Android emulators; package caches for npm/npx/Yarn/pnpm/Bun/uv/pip/Poetry/Conda/Deno/CocoaPods/SwiftPM/Gradle/Cargo/Go/NuGet/Ruby gems/Composer/Bazel/Puppeteer; caches of VS Code and its relatives (Cursor, Windsurf, Antigravity, Kiro, Trae, VSCodium) and JetBrains; ccache, sccache, Coursier, cabal, GHCup, Julia, minikube, Helm, Unity, Foundry and Solana caches; older Claude Code versions (the one in use and the newest are listed as kept); language versions installed by pyenv, rbenv, nvm, fnm, asdf and mise (the default version is kept); Java heap dumps; logs and caches of local AI tools and coding agents (Claude Code, Codex, Gemini CLI, opencode, Aider; conversation history only as *Check first*); downloaded AI models (Ollama, LM Studio, Hugging Face, ComfyUI, GPT4All, Jan, Draw Things, Whisper, kagglehub…, one row per model, never preselected; Ollama layers shared by other models are kept); disks of Docker Desktop, OrbStack, Colima, Lima and Podman (shown with the command that shrinks them, never removed); project builds for Node, Swift, Rust, Python, Gradle, CocoaPods, Dart, Unity, Unreal, Godot, .NET, Terraform, Zig, Elixir and Haskell; Docker build cache, images, containers and volumes. |
 | **Cloud Files** | Large local copies from iCloud Drive, Dropbox, Google Drive and OneDrive. iCloud files can be kept in the cloud only. |
 
 ### Protection
@@ -106,7 +108,7 @@ git push origin v1.0.0
 |---|---|
 | **Maintenance** | Free RAM, flush DNS, reindex Spotlight, rebuild Launch Services, thin Time Machine snapshots, reset Quick Look, verify the startup disk, clear the font cache. Tasks that need a password share one prompt. |
 | **Launch Items** | Turn launchd agents and daemons off and on. |
-| **Mac Health** | Live CPU, memory pressure, disk (including purgeable space macOS frees on demand), network and the heaviest processes, plus how much space MyOpenCleaner has freed. Also in the menu bar. |
+| **Mac Health** | Live CPU, where the memory goes (apps, wired, compressed, cached files) and swap, memory pressure, disk (including purgeable space macOS frees on demand), network and the heaviest processes, plus how much space MyOpenCleaner has freed. Also in the menu bar. |
 | **Battery** | Health, cycle count, temperature, power draw, adapter, manufacture date and raw registry data for your Mac, and for an iPhone or iPad connected by cable. Keeps a health history you can export as CSV. |
 
 ### Applications and clutter
@@ -118,7 +120,7 @@ git push origin v1.0.0
 | **App Leftovers** | Finds settings and caches of apps that are no longer installed. |
 | **Large & Old Files** | Filters your home folder by size, age and kind, including virtual machines (Parallels, UTM, VMware, VirtualBox disks), each counted as one item. |
 | **Duplicates** | Finds identical files by content (SHA-256). Always keeps at least one copy. |
-| **Similar Photos** | Groups bursts, retakes and resized copies with a perceptual hash. |
+| **Similar Media** | Groups bursts, retakes and resized copies of photos with a perceptual hash, and look-alike videos (re-exports, trims, AI takes) by their length and three frames. |
 | **Space Map** | A map of folder sizes you can click through. |
 
 ## FAQ
@@ -159,7 +161,7 @@ macOS 14 Sonoma or later. Build it from source on Apple silicon or Intel.
 |---|---|
 | ![System Junk](docs/screenshots/junk.png) **System Junk** | ![Developer](docs/screenshots/developer.png) **Developer** |
 | ![Uninstaller](docs/screenshots/uninstaller.png) **Uninstaller** | ![Malware](docs/screenshots/malware.png) **Malware** |
-| ![Duplicates](docs/screenshots/duplicates.png) **Duplicates** | ![Similar Photos](docs/screenshots/similar.png) **Similar Photos** |
+| ![Duplicates](docs/screenshots/duplicates.png) **Duplicates** | ![Similar Media](docs/screenshots/similar.png) **Similar Media** |
 | ![Space Map](docs/screenshots/space-map.png) **Space Map** | ![Large & Old Files](docs/screenshots/large-old.png) **Large & Old Files** |
 | ![Privacy](docs/screenshots/privacy.png) **Privacy** | ![Shredder](docs/screenshots/shredder.png) **Shredder** |
 | ![Mac Health](docs/screenshots/monitor.png) **Mac Health** | ![Battery](docs/screenshots/battery.png) **Battery** |
@@ -174,7 +176,8 @@ MyOpenCleaner is built to make the worst case boring.
 
 - **One gate for every deletion.** `SafetyGuard` refuses anything outside your home folder, `/Library`, `/Applications` and a few log and temp folders. `/System`, `/usr`, Keychains and the Photos and Music libraries can never be removed. Folders such as `~/Documents`, `~/Library`, `~/.ssh`, iCloud Drive, Safari and Messages can be emptied by a module but never deleted themselves. Paths are compared without case, and `..` or symlinks pointing elsewhere are rejected.
 - **Trash first.** Everything goes to the Trash unless you switch to permanent deletion in Settings. Only privacy traces, the Shredder, simulators and Docker delete permanently, and each of them says so before it starts.
-- **Nothing preselected that you might miss.** Scanning changes nothing. Risky items (iOS backups, Xcode archives, installers, leftovers, simulators, project builds, duplicates, similar photos) start unselected.
+- **A mark on every row.** On System Junk and Developer each item says how safe it is. **Safe**: rebuilt or downloaded again when needed, or never needed (caches, logs, build files). **Check first**: may hold your own work or history, or cannot be brought back as it was; never selected for you. **Kept**: shown so you know where the space went, never removed (the language version you use, the running simulator, a VM's disk). A test checks that nothing marked *Check first* or *Kept* is ever preselected, and the cleaner refuses *Kept* items even if asked.
+- **Nothing preselected that you might miss.** Scanning changes nothing. Risky items (iOS backups, Xcode archives, installers, leftovers, simulators, project builds, duplicates, similar photos and videos) start unselected.
 - **No silent removals.** Quick Scan asks before cleaning and only reports launch items; removing one is always your decision.
 - **Undo.** Every clean is recorded. Right after it, a toast offers Undo, and Mac Health → Clean history can put any clean whose items are still in the Trash back where they were. Nothing is ever overwritten on the way back.
 - **Nothing in use.** Before removing, MyOpenCleaner asks `lsof` which programs have the files open and names them in the confirmation, so you can quit them first.
@@ -201,12 +204,33 @@ Read-only modes print what a page would offer, without deleting anything:
 
 ```bash
 .build/debug/MyOpenCleaner --scan               # system junk and launch-item threats
+.build/debug/MyOpenCleaner --scan --json        # the same as JSON, with each item's safety
 .build/debug/MyOpenCleaner --dev-scan           # the Developer page
+.build/debug/MyOpenCleaner --dev-scan --json    # the same as JSON
+.build/debug/MyOpenCleaner --list-tools         # the apps and tools MyOpenCleaner knows
 .build/debug/MyOpenCleaner --snapshot <folder>  # render every page to PNG (shows your real data)
 .build/debug/MyOpenCleaner --snapshot <folder> --demo  # the same for a made-up Mac; safe to publish
 ```
 
 `--demo` builds a fake home folder full of invented apps, junk, projects and photos in a temporary directory, answers every external tool (`simctl`, `docker`, `ps`, `networksetup`…) with canned output instead of running it, and deletes the fake Mac when it is done. File icons are replaced with neutral symbols so the screenshots do not reveal which apps are installed on the machine that renders them. The images in `docs/screenshots` were made this way.
+
+## AI agents (MCP)
+
+`MyOpenCleaner --mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin/stdout. An agent can ask what takes space and how safe each item is, then suggest a cleanup. The server is **read-only**: it has no tool that removes anything, so cleaning stays in the app or in `--clean`, where you see and confirm it.
+
+| Tool | What it returns |
+| --- | --- |
+| `scan_junk` | System junk by category, biggest items first, each with its safety. Optional `categories` and `limit`. |
+| `scan_developer` | Developer and AI tool storage by group. Optional `include_projects` (build folders, slower) and `limit`. |
+| `mac_status` | Memory use and pressure, swap, free and purgeable disk space. |
+| `supported_tools` | The catalog of apps and tools MyOpenCleaner knows. |
+
+```bash
+# Claude Code
+claude mcp add myopencleaner -- /Applications/MyOpenCleaner.app/Contents/MacOS/MyOpenCleaner --mcp
+```
+
+For Claude Desktop, Cursor and other clients, add a server whose command is `/Applications/MyOpenCleaner.app/Contents/MacOS/MyOpenCleaner` with the argument `--mcp`. Paths in the answers start with `~`, and the server respects your exclusions.
 
 ## Development
 
@@ -220,7 +244,7 @@ Sources/SweepCore/    scanning and cleaning engine, no UI
 Sources/MyOpenCleaner/     SwiftUI app, menu bar, settings; Battery/ for the battery page
 Tests/SweepCoreTests/ engine tests against fake Macs in temporary folders
 Tests/MyOpenCleanerTests/  battery data parsing tests
-scripts/              app icon generator used by build.sh
+scripts/              app icon, DMG and release notes scripts; update_tools_page.sh regenerates docs/tools
 docs/screenshots/     README images, rendered with --snapshot --demo
 ```
 

@@ -24,7 +24,7 @@ struct JunkView: View {
     }
 
     var body: some View {
-        ModulePage(module: .junk, subtitle: "Caches, logs, Xcode and developer junk, mail attachments, Trash, incomplete downloads.") {
+        ModulePage(module: .junk, subtitle: "Caches, logs, browser and chat app caches, Xcode and developer junk, mail attachments, Trash, incomplete downloads.") {
             Button("Scan", action: scan).disabled(busy)
         } content: {
             if busy && result == nil {
@@ -38,6 +38,10 @@ struct JunkView: View {
                         if !result.unreadable.isEmpty, FullDiskAccess.check(env: state.env) != .denied {
                             fdaBanner(result.unreadable.count)
                         }
+                        SafetyLegend(present: Set(result.items.map(\.safety))) {
+                            selected = Set(result.items.filter { $0.safety == .safe }.map(\.id))
+                        }
+                        Divider()
                         List {
                             ForEach(result.categories) { cat in categorySection(cat, result) }
                         }
@@ -70,7 +74,8 @@ struct JunkView: View {
         return DisclosureGroup(isExpanded: Binding(get: { expanded.contains(cat) },
                                                    set: { if $0 { expanded.insert(cat) } else { expanded.remove(cat) } })) {
             ForEach(items.prefix(300)) { item in
-                FileRow(isOn: member($selected, item.id), url: item.url, size: item.size)
+                FileRow(isOn: member($selected, item.id), url: item.url, title: Self.title(of: item), size: item.size,
+                        safety: item.safety)
             }
             if items.count > 300 { Text("…\(items.count - 300) more").foregroundStyle(.secondary) }
         } label: {
@@ -83,6 +88,12 @@ struct JunkView: View {
                 SizeText(bytes: r.size(of: cat))
             }
         }
+    }
+
+    /// "Slack · Cache" rather than a bare "Cache" for a whole app cache folder.
+    static func title(of item: JunkItem) -> String? {
+        guard item.category == .appCaches, let tool = JunkRules.all.first(where: { $0.id == item.ruleID })?.tool else { return nil }
+        return "\(tool) · \(item.url.lastPathComponent)"
     }
 
     func fdaBanner(_ n: Int) -> some View {
@@ -103,6 +114,7 @@ struct JunkView: View {
             let r = await AppState.background { JunkScanner(env: env).scan() }
             result = r
             selected = r.defaultSelection
+            if Demo.active != nil { expanded = [.appCaches] }
             busy = false
         }
     }

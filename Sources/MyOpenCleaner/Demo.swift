@@ -297,6 +297,25 @@ final class DemoMac: @unchecked Sendable {
         try file("~/Library/Containers/com.example.Notekeeper/Data/Library/Caches/com.example.Notekeeper/Cache.db", mb: 24)
         try file("~/Library/Containers/com.example.Tasklet/Data/Library/Caches/WebKit/NetworkCache", mb: 9)
         try file("~/Library/Group Containers/DEMO123.com.example.shared/Library/Caches/thumbnails.db", mb: 3)
+        // AI coding tools, language versions, a VM disk and chat app caches.
+        try file("~/.codex/log/codex-tui.log", mb: 9)
+        try file("~/.codex/sessions/2026/11/rollout.jsonl", mb: 24)
+        try file("~/Library/Application Support/Windsurf/CachedData/abc/x", mb: 70)
+        for v in ["3.10.14", "3.11.9", "3.12.4"] { try file("~/.pyenv/versions/\(v)/lib/libpython.dylib", mb: 70) }
+        try text("~/.pyenv/version", "3.12.4\n")
+        for v in ["v18.20.4", "v20.18.0"] { try file("~/.nvm/versions/node/\(v)/bin/node", mb: 70) }
+        try text("~/.nvm/alias/default", "20")
+        try file("~/.colima/_lima/colima/diffdisk", mb: 180)
+        try file("~/Library/Application Support/Slack/Cache/Cache_Data/data_1", mb: 130)
+        try file("~/Library/Application Support/Slack/Code Cache/js/index", mb: 24)
+        try file("~/Library/Application Support/discord/Cache/Cache_Data/data_1", mb: 70)
+        try file("~/Library/Application Support/Notion/GPUCache/data_0", mb: 9)
+    }
+
+    private func text(_ path: String, _ content: String) throws {
+        let url = env.resolve(path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(content.utf8).write(to: url)
     }
 
     private func seedSurveyFeatures() throws {
@@ -578,6 +597,7 @@ extension DemoMac {
         return MemoryStats(total: 36 * gb, free: 6 * gb, active: 14 * gb, inactive: 6 * gb, wired: 4 * gb,
                            compressed: 3 * gb, purgeable: 1 * gb, external: 2 * gb)
     }
+    var swap: SwapStats { SwapStats(total: 2 << 30, used: 1_288_490_189) }
     var disk: DiskStats { DiskStats(total: 994_662_584_320, available: 312_480_000_000, strictlyFree: 297_900_000_000) }
     var cpuHistory: [Double] {
         (0..<60).map { (i: Int) -> Double in

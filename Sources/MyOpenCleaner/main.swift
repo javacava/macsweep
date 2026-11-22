@@ -25,18 +25,52 @@ if CommandLine.arguments.contains("--help") {
     MyOpenCleaner — an open-source Mac cleaner.
 
       MyOpenCleaner                         open the app
-      MyOpenCleaner --scan                  print system junk and launch-item threats (removes nothing)
-      MyOpenCleaner --dev-scan              print what the Developer page would offer (removes nothing)
+      MyOpenCleaner --scan [--json]         print system junk and launch-item threats (removes nothing)
+      MyOpenCleaner --dev-scan [--json]     print what the Developer page would offer (removes nothing)
       MyOpenCleaner --clean [options]       clean system junk; a dry run unless --yes (see --clean --help)
+      MyOpenCleaner --mcp                   run a read-only MCP server on stdin/stdout for AI agents
+      MyOpenCleaner --list-tools [--json]   list the apps and tools MyOpenCleaner knows
       MyOpenCleaner --snapshot DIR [--demo] render every page to PNG; --demo uses a made-up Mac
     """)
     exit(0)
 }
 
+/// The environment the command-line modes scan: this Mac, minus the folders the user excluded in Settings.
+func commandLineEnvironment() -> SweepEnvironment {
+    var env = SweepEnvironment.live
+    env.exclusions = AppState.exclusions.map { URL(fileURLWithPath: $0) }
+    return env
+}
+
+let wantsJSON = CommandLine.arguments.contains("--json")
+
+// `MyOpenCleaner --mcp`: answers an AI agent over stdin/stdout. Read-only.
+if CommandLine.arguments.contains("--mcp") {
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    MCPServer.standard(env: commandLineEnvironment(), version: version).serve()
+    exit(0)
+}
+
+// `MyOpenCleaner --list-tools`: the catalog behind the website's list of supported tools.
+if CommandLine.arguments.contains("--list-tools") {
+    if wantsJSON { print(SupportedTools.json()) }
+    else if CommandLine.arguments.contains("--html") { print(SupportedTools.htmlFragment(), terminator: "") }
+    else {
+        for area in SupportedTools.Area.allCases {
+            let tools = SupportedTools.catalog.filter { $0.area == area }
+            guard !tools.isEmpty else { continue }
+            print("\(area.title) (\(tools.count))")
+            for t in tools { print("  \(t.name): " + t.entries.map { "\($0.what) [\($0.safety.rawValue)]" }.joined(separator: "; ")) }
+        }
+    }
+    exit(0)
+}
+
 // `MyOpenCleaner --scan` prints what the junk scanner finds and exits (nothing is deleted).
 if CommandLine.arguments.contains("--scan") {
-    let env = SweepEnvironment.live
+    let env = commandLineEnvironment()
     let r = JunkScanner(env: env).scan()
+    if wantsJSON { print(ScanJSON.string(ScanJSON.junk(r, env: env))); exit(0) }
     for c in r.categories {
         print(c.title.padding(toLength: 32, withPad: " ", startingAt: 0) + FileSize.format(r.size(of: c)) + "  (\(r.items(in: c).count))")
     }
@@ -50,13 +84,17 @@ if CommandLine.arguments.contains("--scan") {
 
 // `MyOpenCleaner --dev-scan` prints what the Developer page would offer and exits (nothing is deleted).
 if CommandLine.arguments.contains("--dev-scan") {
-    let env = SweepEnvironment.live
+    let env = commandLineEnvironment()
     let items = DevFolderScanner(env: env).scan() + SimulatorScanner(env: env).scan() + BuildArtifactFinder(env: env).find()
+    if wantsJSON { print(ScanJSON.string(ScanJSON.developer(items, env: env))); exit(0) }
     for g in DevItem.Group.allCases {
         let rows = items.filter { $0.group == g }.sorted { $0.size > $1.size }
         guard !rows.isEmpty else { continue }
         print("\(g.title): \(FileSize.format(rows.reduce(0) { $0 + $1.size })) (\(rows.count))")
-        for r in rows.prefix(8) { print("   \(r.selectedByDefault ? "[x]" : "[ ]") \(FileSize.format(r.size))\t\(r.title) — \(r.detail)") }
+        for r in rows.prefix(8) {
+            let box = r.isRemovable ? (r.selectedByDefault ? "[x]" : "[ ]") : "[-]"
+            print("   \(box) \(FileSize.format(r.size))\t\(r.title) — \(r.detail) · \(r.safety.title)")
+        }
     }
     switch DockerCleaner().state() {
     case .notInstalled: print("Docker: not installed")

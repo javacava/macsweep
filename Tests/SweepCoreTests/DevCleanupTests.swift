@@ -90,10 +90,16 @@ import Testing
        "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0"}}
     """.utf8)
 
-    @Test func parsesDevicesSkippingBootedAndBadIDs() {
-        let items = SimulatorScanner.parseDevices(devices)
-        #expect(items.map(\.title) == ["iPhone 14", "iPhone 15"], "sorted by size; booted and non-UUID entries dropped")
+    @Test func parsesDevicesKeepingBootedAndDroppingBadIDs() {
+        let all = SimulatorScanner.parseDevices(devices)
+        #expect(all.map(\.title) == ["iPhone 15 Pro", "iPhone 14", "iPhone 15"], "sorted by size; non-UUID entries dropped")
+        let booted = all[0]
+        #expect(booted.safety == .kept && !booted.isRemovable && !booted.selectedByDefault, "a running simulator is shown, never removed")
+        #expect(booted.detail.contains("running now"))
+        let items = all.filter(\.isRemovable)
         let unavailable = items[0], normal = items[1]
+        #expect(unavailable.safety == .safe, "it cannot start, so nothing in it can be used")
+        #expect(normal.safety == .review, "a simulator holds the apps and data installed in it")
         #expect(unavailable.selectedByDefault, "a simulator without its runtime cannot start")
         #expect(unavailable.detail.contains("iOS 16.0") && unavailable.detail.contains("unavailable"))
         #expect(!normal.selectedByDefault)
@@ -133,7 +139,8 @@ import Testing
         runner.responses["/usr/bin/xcrun simctl list devices -j"] = CommandResult(status: 0, output: String(decoding: devices, as: UTF8.self))
         runner.responses["/usr/bin/xcrun simctl runtime list -j"] = CommandResult(status: 0, output: String(decoding: runtimes, as: UTF8.self))
         let items = SimulatorScanner(env: Sandbox().env, runner: runner).scan()
-        #expect(items.filter { $0.group == .simulators }.count == 2)
+        #expect(items.filter { $0.group == .simulators && $0.isRemovable }.count == 2)
+        #expect(items.filter { $0.group == .simulators && !$0.isRemovable }.count == 1, "the running one is kept")
         #expect(items.filter { $0.group == .runtimes }.count == 2)
     }
 }

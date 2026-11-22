@@ -30,7 +30,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "MyOpenCleaner",
-  "description": "Free, open-source Mac cleaner and CleanMyMac alternative: system junk, developer caches, app uninstaller with leftovers, duplicates, similar photos, malware and launch-item checks, privacy cleanup, undo for every clean.",
+  "description": "Free, open-source Mac cleaner and CleanMyMac alternative: system junk, developer and AI tool storage, app uninstaller with leftovers, duplicates, similar photos and videos, malware and launch-item checks, privacy cleanup, a safety mark on every item, undo for every clean.",
   "applicationCategory": "UtilitiesApplication",
   "operatingSystem": "macOS 14 or later",
   "license": "https://opensource.org/licenses/MIT",
@@ -40,9 +40,9 @@
   "url": "https://javacava.github.io/myopencleaner/",
   "image": "https://javacava.github.io/myopencleaner/assets/icon.png",
   "screenshot": "https://javacava.github.io/myopencleaner/assets/shots/quick-scan.jpg",
-  "softwareVersion": "1.0",
+  "softwareVersion": "1.1",
   "downloadUrl": "https://github.com/javacava/myopencleaner/releases/latest",
-  "featureList": "System junk cleanup, Xcode and developer cache cleanup, app uninstaller with leftovers, duplicate finder, similar photos, disk space map, malware and launch item checks, privacy cleanup, file shredder, maintenance tasks, undo for every clean, command-line clean"
+  "featureList": "System junk cleanup, chat app caches, Xcode and developer cache cleanup, AI models and coding agent cleanup, language version cleanup (pyenv, nvm, fnm, rbenv, asdf, mise), safety mark on every item, app uninstaller with leftovers, duplicate finder, similar photos and videos, disk space map, memory and swap monitor, malware and launch item checks, privacy cleanup, file shredder, maintenance tasks, undo for every clean, command-line clean with JSON, read-only MCP server for AI agents"
 }
 </script>
 <script type="application/ld+json">
@@ -297,6 +297,7 @@
       <a href="#safety">Safety</a>
       <a href="#compare">Compare</a>
       <a href="#faq">FAQ</a>
+      <a href="tools/">Tools</a>
       <a href="guides/">Guides</a>
       <a class="nav-cta" href="https://github.com/javacava/myopencleaner">Get it</a>
     </div>
@@ -347,7 +348,7 @@
           <div class="txt">
             <div class="kicker grad">System Junk</div>
             <h3>Gigabytes you never asked for.</h3>
-            <p>Caches, logs, browser data, app container caches, old installers, Mail attachments, incomplete downloads — sorted by size, each with a reason.</p>
+            <p>Caches, logs, browser data, Slack and Discord caches, app container caches, old installers, Mail attachments, incomplete downloads. Every row says whether it is safe, needs a look, or stays.</p>
           </div>
           <div class="img"><img loading="lazy" src="assets/shots/junk.jpg" width="1600" height="1123" alt="System Junk page with categories and sizes"></div>
         </article>
@@ -381,18 +382,18 @@
 
         <article class="tile reveal">
           <div class="txt">
-            <div class="kicker grad">Duplicates &amp; similar photos</div>
+            <div class="kicker grad">Duplicates &amp; similar media</div>
             <h3>Twins, found. Bit for bit.</h3>
-            <p>Identical files by SHA-256, near-identical photos by a perceptual hash. Nothing preselected; one copy always stays.</p>
+            <p>Identical files by SHA-256, near-identical photos by a perceptual hash, and look-alike videos (re-exports, trims, AI takes) by length and three frames. Nothing preselected.</p>
           </div>
-          <div class="img"><img loading="lazy" src="assets/shots/similar.jpg" width="1600" height="1123" alt="Similar photos grouped together"></div>
+          <div class="img"><img loading="lazy" src="assets/shots/similar.jpg" width="1600" height="1123" alt="Similar photos and videos grouped together"></div>
         </article>
 
         <article class="tile wide reveal">
           <div class="txt">
             <div class="kicker grad">Mac Health &amp; menu bar</div>
             <h3>Live telemetry. From your Mac, to you only.</h3>
-            <p>CPU, memory pressure, disk and purgeable space, network and the heaviest apps — plus a clean history where any clean can be undone.</p>
+            <p>CPU, where your memory goes, swap, disk and purgeable space, network and the heaviest apps — plus a clean history where any clean can be undone.</p>
           </div>
           <div class="img"><img loading="lazy" src="assets/shots/monitor.jpg" width="1600" height="1123" alt="Mac Health page with CPU, memory and disk gauges and clean history"></div>
         </article>
@@ -423,7 +424,7 @@
     <div class="wrap">
       <p class="eyebrow reveal">For developers</p>
       <h2 class="reveal">Your toolchain<br>has its own <span class="grad">gravity.</span></h2>
-      <p class="lead reveal">Xcode, simulators, Docker, package managers and AI models pull 50–150 GB into orbit on a developer Mac. MyOpenCleaner brings them back down — one item at a time.</p>
+      <p class="lead reveal">Xcode, simulators, Docker, package managers, AI models and coding agents pull 50–150 GB into orbit on a developer Mac. MyOpenCleaner knows <a href="tools/">150+ tools</a> and brings them back down — one item at a time.</p>
 
       <div class="orbit-stage reveal" aria-label="Developer tools MyOpenCleaner cleans">
         <img class="sun" src="assets/icon.png" alt="">
@@ -459,7 +460,8 @@
       <div class="chip-cloud reveal" aria-hidden="true">
         <span>Xcode DerivedData</span><span>iOS simulators</span><span>node_modules</span><span>Docker</span>
         <span>Ollama models</span><span>npm · pnpm · Yarn</span><span>Cargo · Go · Gradle</span><span>Hugging Face</span>
-        <span>VS Code · JetBrains</span>
+        <span>VS Code · JetBrains</span><span>Cursor · Windsurf</span><span>Claude Code · Codex</span><span>pyenv · nvm · mise</span>
+        <span>ComfyUI · LM Studio</span>
       </div>
 
       <div class="tiles" style="margin-top:20px">
@@ -467,7 +469,7 @@
           <div class="txt">
             <div class="kicker grad">Developer</div>
             <h3>Git-aware. Model-aware. Careful.</h3>
-            <p>Build folders count only next to their project file, and inside a git repo only if nothing in them is tracked. Ollama layers shared by other models stay. Simulators go through Apple's own <code style="font-family:var(--mono)">simctl</code>.</p>
+            <p>Build folders count only next to their project file, and inside a git repo only if nothing in them is tracked. Ollama layers shared by other models stay. The Python or Node version you use by default stays. Simulators go through Apple's own <code style="font-family:var(--mono)">simctl</code>. <a href="tools/">See every supported tool</a>.</p>
           </div>
           <div class="img"><img loading="lazy" src="assets/shots/developer.jpg" width="1600" height="1123" alt="Developer page listing simulators, runtimes, caches, AI models and project builds"></div>
         </article>
@@ -488,7 +490,7 @@
         <div class="feature reveal"><div class="ic">🛡</div><h4>One safety guard</h4><p>Every path is checked. System folders, Keychains, your Photos library and your exclusions can never be removed.</p></div>
         <div class="feature reveal"><div class="ic">◎</div><h4>Nothing in use</h4><p>Before removing, it asks <code>lsof</code> which apps have the files open — and tells you to quit them first.</p></div>
         <div class="feature reveal"><div class="ic">⎇</div><h4>Git knows best</h4><p>Build folders with tracked files, nested repositories or un-ignored generic names are never offered.</p></div>
-        <div class="feature reveal"><div class="ic">◌</div><h4>Nothing preselected that matters</h4><p>Backups, archives, simulators, models, duplicates and photos start unselected. You choose.</p></div>
+        <div class="feature reveal"><div class="ic">◌</div><h4>A mark on every row</h4><p><b>Safe</b> comes back by itself. <b>Check first</b> may hold your work and is never selected for you. <b>Kept</b> is shown so the space adds up, and never removed.</p></div>
         <div class="feature reveal"><div class="ic">✦</div><h4>Private by default</h4><p>No account, no analytics, no telemetry. The only network call is an update check you start yourself.</p></div>
       </div>
     </div>
@@ -515,6 +517,22 @@ Trash: 209.7 MB (2)
     </div>
   </section>
 
+  <!-- ================= AGENTS ================= -->
+  <section class="center" id="agents">
+    <div class="wrap">
+      <p class="eyebrow reveal">Works with your AI agent</p>
+      <h2 class="reveal">Ask what to <span class="grad">clean.</span></h2>
+      <p class="lead reveal">A built-in, read-only MCP server lets Claude Code, Claude Desktop, Codex or Cursor read the scan and draft a cleanup with the safety of every item. It removes nothing; you stay the one who cleans.</p>
+      <div class="term reveal">
+        <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+<pre><span class="p">$</span> claude mcp add myopencleaner -- /Applications/MyOpenCleaner.app/Contents/MacOS/MyOpenCleaner --mcp
+<span class="c">Tools: scan_junk · scan_developer · mac_status · supported_tools</span>
+
+<span class="p">&gt;</span> What is taking the most space, and what can go safely?</pre>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= COMPARE ================= -->
   <section id="compare" class="center">
     <div class="wrap">
@@ -526,7 +544,7 @@ Trash: 209.7 MB (2)
           <tbody>
             <tr><td>Price</td><td class="us yes">Free</td><td>Paid</td></tr>
             <tr><td>Source code</td><td class="us yes">Open (MIT)</td><td>Closed</td></tr>
-            <tr><td>Junk, uninstaller, leftovers, large files, duplicates, similar photos, space map</td><td class="us yes">Yes</td><td>Yes</td></tr>
+            <tr><td>Junk, uninstaller, leftovers, large files, duplicates, similar photos and videos, space map</td><td class="us yes">Yes</td><td>Yes</td></tr>
             <tr><td>Malware and launch items, privacy, shredder, maintenance, menu bar monitor</td><td class="us yes">Yes</td><td>Yes</td></tr>
             <tr><td>Real-time malware protection, mail unsubscribe, cloud-account cleanup</td><td class="us no">No</td><td>Yes</td></tr>
             <tr><td>Download</td><td class="us yes">Free, built in public on GitHub<span class="sub">First launch: one click on Open Anyway</span></td><td>Notarized by Apple</td></tr>
@@ -605,7 +623,7 @@ Trash: 209.7 MB (2)
   <div class="wrap">
     <div>MyOpenCleaner is free software under the <a href="https://github.com/javacava/myopencleaner/blob/main/LICENSE">MIT License</a>. Screenshots show a made-up demo Mac.</div>
     <div>CleanMyMac is a trademark of MacPaw. MyOpenCleaner is an independent open-source project and is not affiliated with, endorsed by or sponsored by MacPaw or Apple. Mac and macOS are trademarks of Apple Inc., registered in the U.S. and other countries.</div>
-    <div class="row"><span>Guides: <a href="guides/clear-system-data-mac/">Clear System Data</a> · <a href="guides/free-up-xcode-space/">Free up Xcode space</a> · <a href="guides/free-cleanmymac-alternatives/">CleanMyMac alternatives</a></span></div>
+    <div class="row"><span>Guides: <a href="guides/clear-system-data-mac/">Clear System Data</a> · <a href="guides/free-up-xcode-space/">Free up Xcode space</a> · <a href="guides/free-cleanmymac-alternatives/">CleanMyMac alternatives</a> · <a href="tools/">Supported tools</a></span></div>
     <div class="row"><span>Made with care, among the stars.</span><a href="https://github.com/javacava/myopencleaner">github.com/javacava/myopencleaner</a></div>
   </div>
 </footer>

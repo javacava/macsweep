@@ -2,7 +2,7 @@ import Foundation
 
 public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     case userCache, systemCache, userLogs, systemLogs, browserCache, xcode, devTools
-    case containerCaches, mailAttachments, trash, iosBackups, brokenDownloads, installers
+    case containerCaches, appCaches, mailAttachments, trash, iosBackups, brokenDownloads, installers
 
     public var id: String { rawValue }
 
@@ -21,6 +21,7 @@ public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable 
         case .brokenDownloads: "Incomplete downloads"
         case .installers: "Installers in Downloads"
         case .containerCaches: "App container caches"
+        case .appCaches: "Chat and work app caches"
         }
     }
 
@@ -37,6 +38,7 @@ public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable 
         case .brokenDownloads: "arrow.down.circle.dotted"
         case .installers: "opticaldiscdrive"
         case .containerCaches: "square.stack.3d.down.right"
+        case .appCaches: "bubble.left.and.bubble.right"
         }
     }
 }
@@ -49,6 +51,8 @@ public struct JunkRule: Sendable, Identifiable {
         case files(extensions: Set<String>)
         /// `path` is a folder of app containers; the children of each container's Caches folder are items.
         case containerCaches(cachesPath: String)
+        /// The folder itself is one item (an app's whole Chromium cache).
+        case whole
     }
 
     public let id: String
@@ -60,12 +64,16 @@ public struct JunkRule: Sendable, Identifiable {
     /// Only items not modified for this long are offered.
     public let minAge: TimeInterval?
     public let selectedByDefault: Bool
+    /// The app or tool the rule is about, for the website's list of supported tools. nil: a macOS location.
+    public let tool: String?
+    public let safety: Safety?
 
     public init(id: String, category: JunkCategory, path: String, mode: Mode = .children,
-                excludes: Set<String> = [], minAge: TimeInterval? = nil, selectedByDefault: Bool = true) {
+                excludes: Set<String> = [], minAge: TimeInterval? = nil, selectedByDefault: Bool = true,
+                tool: String? = nil, safety: Safety? = nil) {
         self.id = id; self.category = category; self.path = path; self.mode = mode
         self.excludes = Set(excludes.map { $0.lowercased() }); self.minAge = minAge
-        self.selectedByDefault = selectedByDefault
+        self.selectedByDefault = selectedByDefault; self.tool = tool; self.safety = safety
     }
 }
 
@@ -94,33 +102,33 @@ public enum JunkRules {
         JunkRule(id: "system-var-logs", category: .systemLogs, path: "/private/var/log",
                  mode: .files(extensions: ["gz", "bz2", "old"])),
 
-        JunkRule(id: "safari-cache", category: .browserCache, path: "~/Library/Caches/com.apple.Safari"),
-        JunkRule(id: "chrome-cache", category: .browserCache, path: "~/Library/Caches/Google/Chrome"),
-        JunkRule(id: "firefox-cache", category: .browserCache, path: "~/Library/Caches/Firefox/Profiles"),
-        JunkRule(id: "edge-cache", category: .browserCache, path: "~/Library/Caches/com.microsoft.edgemac"),
-        JunkRule(id: "brave-cache", category: .browserCache, path: "~/Library/Caches/BraveSoftware/Brave-Browser"),
+        JunkRule(id: "safari-cache", category: .browserCache, path: "~/Library/Caches/com.apple.Safari", tool: "Safari"),
+        JunkRule(id: "chrome-cache", category: .browserCache, path: "~/Library/Caches/Google/Chrome", tool: "Google Chrome"),
+        JunkRule(id: "firefox-cache", category: .browserCache, path: "~/Library/Caches/Firefox/Profiles", tool: "Firefox"),
+        JunkRule(id: "edge-cache", category: .browserCache, path: "~/Library/Caches/com.microsoft.edgemac", tool: "Microsoft Edge"),
+        JunkRule(id: "brave-cache", category: .browserCache, path: "~/Library/Caches/BraveSoftware/Brave-Browser", tool: "Brave"),
 
-        JunkRule(id: "xcode-derived", category: .xcode, path: "~/Library/Developer/Xcode/DerivedData"),
-        JunkRule(id: "xcode-device-support", category: .xcode, path: "~/Library/Developer/Xcode/iOS DeviceSupport"),
-        JunkRule(id: "xcode-watch-support", category: .xcode, path: "~/Library/Developer/Xcode/watchOS DeviceSupport"),
+        JunkRule(id: "xcode-derived", category: .xcode, path: "~/Library/Developer/Xcode/DerivedData", tool: "Xcode"),
+        JunkRule(id: "xcode-device-support", category: .xcode, path: "~/Library/Developer/Xcode/iOS DeviceSupport", tool: "Xcode"),
+        JunkRule(id: "xcode-watch-support", category: .xcode, path: "~/Library/Developer/Xcode/watchOS DeviceSupport", tool: "Xcode"),
         JunkRule(id: "xcode-archives", category: .xcode, path: "~/Library/Developer/Xcode/Archives",
-                 minAge: 180 * day, selectedByDefault: false),
-        JunkRule(id: "xcode-cache", category: .xcode, path: "~/Library/Caches/com.apple.dt.Xcode"),
-        JunkRule(id: "simulator-caches", category: .xcode, path: "~/Library/Developer/CoreSimulator/Caches"),
+                 minAge: 180 * day, selectedByDefault: false, tool: "Xcode", safety: .review),
+        JunkRule(id: "xcode-cache", category: .xcode, path: "~/Library/Caches/com.apple.dt.Xcode", tool: "Xcode"),
+        JunkRule(id: "simulator-caches", category: .xcode, path: "~/Library/Developer/CoreSimulator/Caches", tool: "Xcode"),
 
-        JunkRule(id: "brew-cache", category: .devTools, path: "~/Library/Caches/Homebrew"),
-        JunkRule(id: "yarn-cache", category: .devTools, path: "~/Library/Caches/Yarn"),
-        JunkRule(id: "pip-cache", category: .devTools, path: "~/Library/Caches/pip"),
-        JunkRule(id: "cocoapods-cache", category: .devTools, path: "~/Library/Caches/CocoaPods"),
-        JunkRule(id: "swiftpm-cache", category: .devTools, path: "~/Library/Caches/org.swift.swiftpm"),
-        JunkRule(id: "npm-cache", category: .devTools, path: "~/.npm/_cacache"),
-        JunkRule(id: "gradle-cache", category: .devTools, path: "~/.gradle/caches"),
-        JunkRule(id: "cargo-cache", category: .devTools, path: "~/.cargo/registry/cache"),
+        JunkRule(id: "brew-cache", category: .devTools, path: "~/Library/Caches/Homebrew", tool: "Homebrew"),
+        JunkRule(id: "yarn-cache", category: .devTools, path: "~/Library/Caches/Yarn", tool: "Yarn"),
+        JunkRule(id: "pip-cache", category: .devTools, path: "~/Library/Caches/pip", tool: "pip"),
+        JunkRule(id: "cocoapods-cache", category: .devTools, path: "~/Library/Caches/CocoaPods", tool: "CocoaPods"),
+        JunkRule(id: "swiftpm-cache", category: .devTools, path: "~/Library/Caches/org.swift.swiftpm", tool: "Swift Package Manager"),
+        JunkRule(id: "npm-cache", category: .devTools, path: "~/.npm/_cacache", tool: "npm"),
+        JunkRule(id: "gradle-cache", category: .devTools, path: "~/.gradle/caches", tool: "Gradle"),
+        JunkRule(id: "cargo-cache", category: .devTools, path: "~/.cargo/registry/cache", tool: "Cargo"),
 
         JunkRule(id: "mail-downloads", category: .mailAttachments,
-                 path: "~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads", minAge: 30 * day),
+                 path: "~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads", minAge: 30 * day, tool: "Mail"),
         JunkRule(id: "mail-downloads-legacy", category: .mailAttachments, path: "~/Library/Mail Downloads",
-                 minAge: 30 * day),
+                 minAge: 30 * day, tool: "Mail"),
 
         JunkRule(id: "trash", category: .trash, path: "~/.Trash"),
         JunkRule(id: "ios-backups", category: .iosBackups, path: "~/Library/Application Support/MobileSync/Backup",
@@ -133,7 +141,35 @@ public enum JunkRules {
                  mode: .containerCaches(cachesPath: "Library/Caches"), excludes: userCacheExcludes),
         JunkRule(id: "installers", category: .installers, path: "~/Downloads",
                  mode: .files(extensions: ["dmg", "pkg", "mpkg", "xip"]), minAge: 7 * day, selectedByDefault: false),
+    ] + electronAppCaches
+
+    /// Apps built on Electron keep Chromium's caches in Application Support/<folder>. Only cache folders are
+    /// listed: messages, drafts, settings and local storage live next to them and are never touched.
+    static let electronApps: [(tool: String, folder: String)] = [
+        ("Slack", "~/Library/Application Support/Slack"),
+        ("Slack", "~/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack"),
+        ("Discord", "~/Library/Application Support/discord"),
+        ("Signal", "~/Library/Application Support/Signal"),
+        ("Microsoft Teams (classic)", "~/Library/Application Support/Microsoft/Teams"),
+        ("Notion", "~/Library/Application Support/Notion"),
+        ("Obsidian", "~/Library/Application Support/obsidian"),
+        ("Figma", "~/Library/Application Support/Figma"),
+        ("Linear", "~/Library/Application Support/Linear"),
+        ("Postman", "~/Library/Application Support/Postman"),
+        ("GitHub Desktop", "~/Library/Application Support/GitHub Desktop"),
+        ("Claude", "~/Library/Application Support/Claude"),
+        ("Element", "~/Library/Application Support/Element"),
+        ("Mattermost", "~/Library/Application Support/Mattermost"),
+        ("Loom", "~/Library/Application Support/Loom"),
     ]
+    static let chromiumCacheFolders = ["Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache"]
+
+    static let electronAppCaches: [JunkRule] = electronApps.flatMap { app in
+        chromiumCacheFolders.map { folder in
+            JunkRule(id: "app-cache:\(app.folder)/\(folder)", category: .appCaches, path: app.folder + "/" + folder,
+                     mode: .whole, tool: app.tool)
+        }
+    }
 }
 
 public struct JunkItem: Identifiable, Hashable, Sendable {
@@ -143,6 +179,7 @@ public struct JunkItem: Identifiable, Hashable, Sendable {
     public let category: JunkCategory
     public let ruleID: String
     public let selectedByDefault: Bool
+    public var safety: Safety = .safe
 }
 
 public struct JunkScanResult: Sendable {
@@ -183,6 +220,7 @@ public final class JunkScanner: @unchecked Sendable {
                 result.unreadable.append(dir)
                 continue
             }
+            if rule.mode == .whole { children = [dir] }
             if case .containerCaches(let cachesPath) = rule.mode {
                 // Caches inside each sandbox container; tiny ones are left out to keep the list readable.
                 children = children.flatMap { fm.children(of: $0.appendingPathComponent(cachesPath)) }
@@ -203,8 +241,9 @@ public final class JunkScanner: @unchecked Sendable {
                 guard claimed.insert(child.standardizedFileURL.path).inserted else { continue }
                 let size = FileSize.of(child)
                 guard size > 0 else { continue }
-                result.items.append(JunkItem(url: child, size: size, category: rule.category,
-                                             ruleID: rule.id, selectedByDefault: rule.selectedByDefault))
+                result.items.append(JunkItem(url: child, size: size, category: rule.category, ruleID: rule.id,
+                                             selectedByDefault: rule.selectedByDefault,
+                                             safety: rule.safety ?? rule.category.safety))
             }
         }
         result.items.sort { $0.size > $1.size }

@@ -51,6 +51,29 @@ public struct MemoryStats: Equatable, Sendable {
     }
 }
 
+public extension MemoryStats {
+    /// Memory apps hold, as Activity Monitor's "App Memory" (active + inactive minus file cache).
+    var appMemory: UInt64 { active + inactive > purgeable + external ? active + inactive - purgeable - external : 0 }
+}
+
+/// The swap file macOS writes memory to when RAM runs short.
+public struct SwapStats: Equatable, Sendable {
+    public var total: UInt64
+    public var used: UInt64
+
+    public init(total: UInt64, used: UInt64) { self.total = total; self.used = used }
+
+    public var usedFraction: Double { total > 0 ? min(Double(used) / Double(total), 1) : 0 }
+
+    /// A sentence for people: swap is normal in small amounts, a sign of too little memory in large ones.
+    public func advice(physicalMemory: UInt64) -> String {
+        if used == 0 { return "No swap in use: everything fits in memory." }
+        let share = Double(used) / Double(max(physicalMemory, 1))
+        if share < 0.1 { return "A little swap is normal: macOS moves memory it has not touched for a while to disk." }
+        return "Heavy swap: memory runs short and the Mac slows down. Quit apps you are not using, or restart the heaviest one."
+    }
+}
+
 public struct DiskStats: Equatable, Sendable {
     public var total: Int64
     public var available: Int64
@@ -113,6 +136,14 @@ public enum SystemMonitor {
                            compressed: UInt64(stats.compressor_page_count) * page,
                            purgeable: UInt64(stats.purgeable_count) * page,
                            external: UInt64(stats.external_page_count) * page)
+    }
+
+    /// `sysctl vm.swapusage`.
+    public static func swap() -> SwapStats? {
+        var usage = xsw_usage()
+        var size = MemoryLayout<xsw_usage>.size
+        guard sysctlbyname("vm.swapusage", &usage, &size, nil, 0) == 0 else { return nil }
+        return SwapStats(total: usage.xsu_total, used: usage.xsu_used)
     }
 
     public static func disk(_ volume: URL = URL(fileURLWithPath: "/")) -> DiskStats? {

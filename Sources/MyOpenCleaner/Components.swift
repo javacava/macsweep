@@ -74,6 +74,7 @@ struct FileRow: View {
     var title: String? = nil
     var detail: String? = nil
     let size: Int64
+    var safety: Safety? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -85,6 +86,7 @@ struct FileRow: View {
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
             Spacer()
+            if let safety { SafetyBadge(safety: safety) }
             SizeText(bytes: size)
             Button { AppState.reveal(url) } label: { Image(systemName: "magnifyingglass") }
                 .buttonStyle(.borderless).help("Show in Finder")
@@ -224,4 +226,74 @@ extension Set where Element == String {
 /// A checkbox binding for one id inside a selection set.
 func member(_ set: Binding<Set<String>>, _ id: String) -> Binding<Bool> {
     Binding(get: { set.wrappedValue.contains(id) }, set: { set.wrappedValue.toggle(id, $0) })
+}
+
+// MARK: - Safety
+
+extension Safety {
+    /// The word on the badge.
+    var shortTitle: String {
+        switch self {
+        case .safe: "Safe"
+        case .review: "Check first"
+        case .kept: "Kept"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .safe: .green
+        case .review: .orange
+        case .kept: .secondary
+        }
+    }
+}
+
+/// A small tinted label that says how safe a row is to remove; the tooltip explains it.
+struct SafetyBadge: View {
+    let safety: Safety
+    var body: some View {
+        Label(safety.shortTitle, systemImage: safety.symbol)
+            .labelStyle(.titleAndIcon)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(safety.tint)
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(safety.tint.opacity(0.12), in: Capsule())
+            .fixedSize()
+            .help(safety.title + ": " + safety.explanation)
+    }
+}
+
+/// The key to the badges, above a cleanup list, with a shortcut that picks every safe row.
+struct SafetyLegend: View {
+    var present: Set<Safety>
+    var selectSafe: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(Safety.allCases.filter(present.contains), id: \.self) { s in
+                HStack(spacing: 5) {
+                    SafetyBadge(safety: s)
+                    Text(s.legend).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if let selectSafe, present.contains(.safe) {
+                Button("Select all safe", action: selectSafe).controlSize(.small)
+                    .help("Selects every row marked Safe and nothing else")
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 7)
+    }
+}
+
+extension Safety {
+    /// A few words next to the badge in the legend.
+    var legend: String {
+        switch self {
+        case .safe: "comes back by itself"
+        case .review: "may hold your work"
+        case .kept: "shown, never removed"
+        }
+    }
 }

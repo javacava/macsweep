@@ -3,8 +3,8 @@ import Foundation
 /// One thing the Developer page can remove: a simulator, a runtime, a firmware file, a cache, a build folder.
 public struct DevItem: Identifiable, Hashable, Sendable {
     public enum Group: String, CaseIterable, Sendable, Identifiable {
-        case simulators, runtimes, firmware, xcode, android, packageCaches, ideCaches, oldVersions, aiTools, aiModels,
-             heapDumps, builds
+        case simulators, runtimes, firmware, xcode, android, packageCaches, ideCaches, oldVersions, toolVersions, aiTools,
+             aiModels, virtualMachines, heapDumps, builds
 
         public var id: String { rawValue }
 
@@ -19,6 +19,8 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .aiTools: "AI tool logs and caches"
             case .ideCaches: "Editor and IDE caches"
             case .oldVersions: "Old tool versions"
+            case .toolVersions: "Language versions"
+            case .virtualMachines: "Virtual machines and container disks"
             case .heapDumps: "Java heap dumps"
             case .aiModels: "Downloaded AI models"
             case .builds: "Builds and dependencies in projects"
@@ -36,6 +38,8 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .aiTools: "brain"
             case .ideCaches: "chevron.left.forwardslash.chevron.right"
             case .oldVersions: "clock.arrow.circlepath"
+            case .toolVersions: "square.stack.3d.up"
+            case .virtualMachines: "server.rack"
             case .heapDumps: "memorychip"
             case .aiModels: "cube.box"
             case .builds: "folder.badge.gearshape"
@@ -50,10 +54,12 @@ public struct DevItem: Identifiable, Hashable, Sendable {
             case .xcode: "Intermediate build files. Xcode rebuilds them; the first build takes longer."
             case .android: "Android Studio virtual devices and downloaded system images."
             case .packageCaches: "Downloaded packages. The package manager fetches them again when needed."
-            case .ideCaches: "Caches of VS Code, Cursor and JetBrains IDEs. Quit the editor first; it rebuilds them on the next start."
+            case .ideCaches: "Caches of VS Code and the editors built on it (Cursor, Windsurf, Antigravity, Kiro, Trae) and of JetBrains IDEs. Quit the editor first; it rebuilds them on the next start."
             case .oldVersions: "Earlier versions that tools keep after an update, and Xcode's optional Metal toolchain. The version in use is never offered."
+            case .toolVersions: "Python, Node, Ruby and other versions installed by pyenv, nvm, fnm, rbenv, asdf and mise. The default version is kept; a project pinned to a removed version needs it installed again."
+            case .virtualMachines: "Disks of Docker Desktop, OrbStack, Colima, Lima and Podman. They hold your containers and images, so MyOpenCleaner only shows them; shrink them with the tool's own command."
             case .heapDumps: ".hprof files Java writes when a program runs out of memory. Useful only while you investigate that crash."
-            case .aiTools: "Logs and caches of local AI apps such as Ollama and LM Studio. Downloaded models and chat history are never offered."
+            case .aiTools: "Logs and caches of local AI apps and coding agents (Ollama, LM Studio, Claude Code, Codex, Gemini CLI, opencode, Aider). Conversation history is marked Check first and never selected; Claude Code's projects and memory are never offered."
             case .aiModels: "Models you downloaded for local AI apps. Nothing here is preselected: remove only models you no longer use; the app downloads them again if you need them."
             case .builds: "node_modules, .build, target, Pods and so on. Restored by the project's install or build command."
             }
@@ -77,108 +83,161 @@ public struct DevItem: Identifiable, Hashable, Sendable {
     /// Where it lives, for "Reveal in Finder".
     public var location: URL? = nil
     public var lastUsed: Date? = nil
+    /// Set when the item differs from its group's usual safety (an archive among Xcode caches, the version in use…).
+    public var safetyOverride: Safety? = nil
+
+    public var safety: Safety { safetyOverride ?? group.safety }
+    /// Kept items are shown but can never be selected or removed.
+    public var isRemovable: Bool { safety != .kept }
 }
 
 // MARK: - Folders (firmware, Xcode, Android, package caches)
 
 struct DevFolderRule {
     enum Mode: Equatable { case children, whole }
+    /// The tool's name as people know it; the website's list of supported tools is built from it.
+    let tool: String
     let group: DevItem.Group
     let title: String
     let path: String
     var mode: Mode = .whole
     var selected = true
+    var safety: Safety? = nil
+
+    init(_ tool: String, _ group: DevItem.Group, _ title: String, _ path: String, mode: Mode = .whole,
+         selected: Bool = true, safety: Safety? = nil) {
+        self.tool = tool; self.group = group; self.title = title; self.path = path
+        self.mode = mode; self.selected = selected; self.safety = safety
+    }
 }
 
 public struct DevFolderScanner: Sendable {
     public let env: SweepEnvironment
     public init(env: SweepEnvironment) { self.env = env }
 
+    /// VS Code and the editors built on it keep the same Chromium caches under Application Support/<folder>.
+    static let vscodeFamily: [(name: String, folder: String)] = [
+        ("VS Code", "Code"), ("VS Code Insiders", "Code - Insiders"), ("VSCodium", "VSCodium"), ("Cursor", "Cursor"),
+        ("Windsurf", "Windsurf"), ("Antigravity", "Antigravity"), ("Kiro", "Kiro"), ("Trae", "Trae"),
+    ]
+    static let vscodeParts: [(folder: String, label: String)] = [
+        ("Cache", "cache"), ("CachedData", "old versions data"), ("CachedExtensionVSIXs", "extension downloads"),
+        ("Code Cache", "code cache"), ("GPUCache", "GPU cache"), ("logs", "logs"),
+    ]
+
     static let rules: [DevFolderRule] = [
         // Firmware
-        .init(group: .firmware, title: "iPhone firmware", path: "~/Library/iTunes/iPhone Software Updates", mode: .children),
-        .init(group: .firmware, title: "iPad firmware", path: "~/Library/iTunes/iPad Software Updates", mode: .children),
-        .init(group: .firmware, title: "iPod firmware", path: "~/Library/iTunes/iPod Software Updates", mode: .children),
-        .init(group: .firmware, title: "Firmware (Apple Configurator)",
-              path: "~/Library/Group Containers/K36BKF7T3D.group.com.apple.configurator/Library/Caches/Firmware", mode: .children),
-        .init(group: .firmware, title: "iOS symbols", path: "~/Library/Developer/Xcode/iOS DeviceSupport", mode: .children),
-        .init(group: .firmware, title: "watchOS symbols", path: "~/Library/Developer/Xcode/watchOS DeviceSupport", mode: .children),
-        .init(group: .firmware, title: "tvOS symbols", path: "~/Library/Developer/Xcode/tvOS DeviceSupport", mode: .children),
-        .init(group: .firmware, title: "visionOS symbols", path: "~/Library/Developer/Xcode/visionOS DeviceSupport", mode: .children),
+        .init("Finder / iTunes", .firmware, "iPhone firmware", "~/Library/iTunes/iPhone Software Updates", mode: .children),
+        .init("Finder / iTunes", .firmware, "iPad firmware", "~/Library/iTunes/iPad Software Updates", mode: .children),
+        .init("Finder / iTunes", .firmware, "iPod firmware", "~/Library/iTunes/iPod Software Updates", mode: .children),
+        .init("Apple Configurator", .firmware, "Firmware (Apple Configurator)",
+              "~/Library/Group Containers/K36BKF7T3D.group.com.apple.configurator/Library/Caches/Firmware", mode: .children),
+        .init("Xcode", .firmware, "iOS symbols", "~/Library/Developer/Xcode/iOS DeviceSupport", mode: .children),
+        .init("Xcode", .firmware, "watchOS symbols", "~/Library/Developer/Xcode/watchOS DeviceSupport", mode: .children),
+        .init("Xcode", .firmware, "tvOS symbols", "~/Library/Developer/Xcode/tvOS DeviceSupport", mode: .children),
+        .init("Xcode", .firmware, "visionOS symbols", "~/Library/Developer/Xcode/visionOS DeviceSupport", mode: .children),
         // Xcode
-        .init(group: .xcode, title: "DerivedData", path: "~/Library/Developer/Xcode/DerivedData", mode: .children),
-        .init(group: .xcode, title: "Archive", path: "~/Library/Developer/Xcode/Archives", mode: .children, selected: false),
-        .init(group: .xcode, title: "Xcode cache", path: "~/Library/Caches/com.apple.dt.Xcode"),
-        .init(group: .xcode, title: "Simulator cache", path: "~/Library/Developer/CoreSimulator/Caches"),
-        .init(group: .xcode, title: "SwiftUI Previews simulators", path: "~/Library/Developer/Xcode/UserData/Previews/Simulator Devices"),
-        .init(group: .xcode, title: "Device logs", path: "~/Library/Developer/Xcode/iOS Device Logs"),
-        .init(group: .xcode, title: "Documentation cache", path: "~/Library/Developer/Xcode/DocumentationCache"),
-        .init(group: .xcode, title: "XCTest devices", path: "~/Library/Developer/XCTestDevices", mode: .children),
+        .init("Xcode", .xcode, "DerivedData", "~/Library/Developer/Xcode/DerivedData", mode: .children),
+        // An archive holds the build you shipped and its debug symbols: it cannot be made again exactly.
+        .init("Xcode", .xcode, "Archive", "~/Library/Developer/Xcode/Archives", mode: .children, selected: false, safety: .review),
+        .init("Xcode", .xcode, "Xcode cache", "~/Library/Caches/com.apple.dt.Xcode"),
+        .init("Xcode", .xcode, "Simulator cache", "~/Library/Developer/CoreSimulator/Caches"),
+        .init("Xcode", .xcode, "SwiftUI Previews simulators", "~/Library/Developer/Xcode/UserData/Previews/Simulator Devices"),
+        .init("Xcode", .xcode, "Device logs", "~/Library/Developer/Xcode/iOS Device Logs"),
+        .init("Xcode", .xcode, "Documentation cache", "~/Library/Developer/Xcode/DocumentationCache"),
+        .init("Xcode", .xcode, "XCTest devices", "~/Library/Developer/XCTestDevices", mode: .children),
         // Package managers
-        .init(group: .packageCaches, title: "npm", path: "~/.npm/_cacache"),
-        .init(group: .packageCaches, title: "npx", path: "~/.npm/_npx"),
-        .init(group: .packageCaches, title: "Yarn", path: "~/Library/Caches/Yarn"),
-        .init(group: .packageCaches, title: "Yarn Berry", path: "~/.yarn/berry/cache"),
-        .init(group: .packageCaches, title: "pnpm (store)", path: "~/Library/pnpm/store", selected: false),
-        .init(group: .packageCaches, title: "Bun", path: "~/.bun/install/cache"),
-        .init(group: .packageCaches, title: "node-gyp", path: "~/Library/Caches/node-gyp"),
-        .init(group: .packageCaches, title: "Electron", path: "~/Library/Caches/electron"),
-        .init(group: .packageCaches, title: "pip", path: "~/Library/Caches/pip"),
-        .init(group: .packageCaches, title: "CocoaPods", path: "~/Library/Caches/CocoaPods"),
-        .init(group: .packageCaches, title: "Swift Package Manager", path: "~/Library/Caches/org.swift.swiftpm"),
-        .init(group: .packageCaches, title: "Carthage", path: "~/Library/Caches/org.carthage.CarthageKit"),
-        .init(group: .packageCaches, title: "Gradle", path: "~/.gradle/caches"),
-        .init(group: .packageCaches, title: "Cargo", path: "~/.cargo/registry/cache"),
-        .init(group: .packageCaches, title: "Go (build cache)", path: "~/Library/Caches/go-build"),
-        .init(group: .packageCaches, title: "Homebrew", path: "~/Library/Caches/Homebrew"),
-        .init(group: .packageCaches, title: "Maven (repository)", path: "~/.m2/repository", selected: false),
-        .init(group: .packageCaches, title: "Flutter / Dart pub", path: "~/.pub-cache", selected: false),
-        .init(group: .packageCaches, title: "Playwright (browsers)", path: "~/Library/Caches/ms-playwright", selected: false),
-        .init(group: .packageCaches, title: "Cypress", path: "~/Library/Caches/Cypress", selected: false),
-        .init(group: .packageCaches, title: "Yarn (~/.cache)", path: "~/.cache/yarn"),
-        .init(group: .packageCaches, title: "pnpm (~/.local/share)", path: "~/.local/share/pnpm/store", selected: false),
-        .init(group: .packageCaches, title: "pnpm (~/.pnpm-store)", path: "~/.pnpm-store", selected: false),
-        .init(group: .packageCaches, title: "uv", path: "~/.cache/uv"),
-        .init(group: .packageCaches, title: "uv (Library)", path: "~/Library/Caches/uv"),
-        .init(group: .packageCaches, title: "Poetry", path: "~/Library/Caches/pypoetry"),
-        .init(group: .packageCaches, title: "Deno", path: "~/Library/Caches/deno"),
-        .init(group: .packageCaches, title: "Puppeteer (browsers)", path: "~/.cache/puppeteer", selected: false),
-        .init(group: .packageCaches, title: "Go (modules)", path: "~/go/pkg/mod", selected: false),
-        .init(group: .packageCaches, title: "Gradle (wrapper distributions)", path: "~/.gradle/wrapper/dists", selected: false),
-        .init(group: .packageCaches, title: "Cargo (git checkouts)", path: "~/.cargo/git/checkouts"),
-        .init(group: .packageCaches, title: "Cargo (git database)", path: "~/.cargo/git/db", selected: false),
-        .init(group: .packageCaches, title: "NuGet", path: "~/.nuget/packages", selected: false),
-        .init(group: .packageCaches, title: "Ruby gems (spec cache)", path: "~/.gem/specs"),
-        .init(group: .packageCaches, title: "Ruby gems (spec cache)", path: "~/.local/share/gem/specs"),
-        .init(group: .packageCaches, title: "Bundler", path: "~/.bundle/cache"),
-        .init(group: .packageCaches, title: "Composer", path: "~/Library/Caches/composer"),
-        .init(group: .packageCaches, title: "Composer", path: "~/.composer/cache"),
-        .init(group: .packageCaches, title: "Composer", path: "~/.cache/composer"),
-        .init(group: .packageCaches, title: "Bazel (disk cache)", path: "~/.cache/bazel", selected: false),
+        .init("npm", .packageCaches, "npm", "~/.npm/_cacache"),
+        .init("npm", .packageCaches, "npx", "~/.npm/_npx"),
+        .init("Yarn", .packageCaches, "Yarn", "~/Library/Caches/Yarn"),
+        .init("Yarn", .packageCaches, "Yarn Berry", "~/.yarn/berry/cache"),
+        .init("pnpm", .packageCaches, "pnpm (store)", "~/Library/pnpm/store", selected: false),
+        .init("Bun", .packageCaches, "Bun", "~/.bun/install/cache"),
+        .init("node-gyp", .packageCaches, "node-gyp", "~/Library/Caches/node-gyp"),
+        .init("Electron", .packageCaches, "Electron", "~/Library/Caches/electron"),
+        .init("pip", .packageCaches, "pip", "~/Library/Caches/pip"),
+        .init("CocoaPods", .packageCaches, "CocoaPods", "~/Library/Caches/CocoaPods"),
+        .init("Swift Package Manager", .packageCaches, "Swift Package Manager", "~/Library/Caches/org.swift.swiftpm"),
+        .init("Carthage", .packageCaches, "Carthage", "~/Library/Caches/org.carthage.CarthageKit"),
+        .init("Gradle", .packageCaches, "Gradle", "~/.gradle/caches"),
+        .init("Cargo", .packageCaches, "Cargo", "~/.cargo/registry/cache"),
+        .init("Go", .packageCaches, "Go (build cache)", "~/Library/Caches/go-build"),
+        .init("Homebrew", .packageCaches, "Homebrew", "~/Library/Caches/Homebrew"),
+        .init("Maven", .packageCaches, "Maven (repository)", "~/.m2/repository", selected: false),
+        .init("Flutter / Dart", .packageCaches, "Flutter / Dart pub", "~/.pub-cache", selected: false),
+        .init("Playwright", .packageCaches, "Playwright (browsers)", "~/Library/Caches/ms-playwright", selected: false),
+        .init("Cypress", .packageCaches, "Cypress", "~/Library/Caches/Cypress", selected: false),
+        .init("Yarn", .packageCaches, "Yarn (~/.cache)", "~/.cache/yarn"),
+        .init("pnpm", .packageCaches, "pnpm (~/.local/share)", "~/.local/share/pnpm/store", selected: false),
+        .init("pnpm", .packageCaches, "pnpm (~/.pnpm-store)", "~/.pnpm-store", selected: false),
+        .init("uv", .packageCaches, "uv", "~/.cache/uv"),
+        .init("uv", .packageCaches, "uv (Library)", "~/Library/Caches/uv"),
+        .init("Poetry", .packageCaches, "Poetry", "~/Library/Caches/pypoetry"),
+        .init("Deno", .packageCaches, "Deno", "~/Library/Caches/deno"),
+        .init("Puppeteer", .packageCaches, "Puppeteer (browsers)", "~/.cache/puppeteer", selected: false),
+        .init("Go", .packageCaches, "Go (modules)", "~/go/pkg/mod", selected: false),
+        .init("Gradle", .packageCaches, "Gradle (wrapper distributions)", "~/.gradle/wrapper/dists", selected: false),
+        .init("Cargo", .packageCaches, "Cargo (git checkouts)", "~/.cargo/git/checkouts"),
+        .init("Cargo", .packageCaches, "Cargo (git database)", "~/.cargo/git/db", selected: false),
+        .init("NuGet", .packageCaches, "NuGet", "~/.nuget/packages", selected: false),
+        .init("RubyGems", .packageCaches, "Ruby gems (spec cache)", "~/.gem/specs"),
+        .init("RubyGems", .packageCaches, "Ruby gems (spec cache)", "~/.local/share/gem/specs"),
+        .init("Bundler", .packageCaches, "Bundler", "~/.bundle/cache"),
+        .init("Composer", .packageCaches, "Composer", "~/Library/Caches/composer"),
+        .init("Composer", .packageCaches, "Composer", "~/.composer/cache"),
+        .init("Composer", .packageCaches, "Composer", "~/.cache/composer"),
+        .init("Bazel", .packageCaches, "Bazel (disk cache)", "~/.cache/bazel", selected: false),
         // Conda's package cache: environments hard-link into it, so removing it frees less than it shows.
-        .init(group: .packageCaches, title: "Conda packages (miniconda)", path: "~/miniconda3/pkgs", selected: false),
-        .init(group: .packageCaches, title: "Conda packages (anaconda)", path: "~/anaconda3/pkgs", selected: false),
-        .init(group: .packageCaches, title: "Conda packages (miniforge)", path: "~/miniforge3/pkgs", selected: false),
-        .init(group: .packageCaches, title: "Conda packages", path: "~/.conda/pkgs", selected: false),
-        // Editors and IDEs
-        .init(group: .ideCaches, title: "VS Code cache", path: "~/Library/Application Support/Code/Cache"),
-        .init(group: .ideCaches, title: "VS Code old versions data", path: "~/Library/Application Support/Code/CachedData"),
-        .init(group: .ideCaches, title: "VS Code extension downloads", path: "~/Library/Application Support/Code/CachedExtensionVSIXs"),
-        .init(group: .ideCaches, title: "VS Code code cache", path: "~/Library/Application Support/Code/Code Cache"),
-        .init(group: .ideCaches, title: "VS Code GPU cache", path: "~/Library/Application Support/Code/GPUCache"),
-        .init(group: .ideCaches, title: "VS Code logs", path: "~/Library/Application Support/Code/logs"),
-        .init(group: .ideCaches, title: "Cursor cache", path: "~/Library/Application Support/Cursor/Cache"),
-        .init(group: .ideCaches, title: "Cursor old versions data", path: "~/Library/Application Support/Cursor/CachedData"),
-        .init(group: .ideCaches, title: "Cursor code cache", path: "~/Library/Application Support/Cursor/Code Cache"),
-        .init(group: .ideCaches, title: "Cursor logs", path: "~/Library/Application Support/Cursor/logs"),
-        .init(group: .ideCaches, title: "JetBrains", path: "~/Library/Caches/JetBrains", mode: .children),
-        .init(group: .ideCaches, title: "JetBrains logs", path: "~/Library/Logs/JetBrains", mode: .children),
-        // Local AI apps: logs and caches only, never models or conversations.
-        .init(group: .aiTools, title: "Ollama logs", path: "~/.ollama/logs"),
-        .init(group: .aiTools, title: "Ollama cache", path: "~/Library/Caches/ollama"),
-        .init(group: .aiTools, title: "Ollama app cache", path: "~/Library/Caches/com.electron.ollama"),
-        .init(group: .aiTools, title: "LM Studio server logs", path: "~/.lmstudio/server-logs"),
-    ]
+        .init("Conda", .packageCaches, "Conda packages (miniconda)", "~/miniconda3/pkgs", selected: false),
+        .init("Conda", .packageCaches, "Conda packages (anaconda)", "~/anaconda3/pkgs", selected: false),
+        .init("Conda", .packageCaches, "Conda packages (miniforge)", "~/miniforge3/pkgs", selected: false),
+        .init("Conda", .packageCaches, "Conda packages", "~/.conda/pkgs", selected: false),
+        // Compilers and build tools
+        .init("ccache", .packageCaches, "ccache", "~/Library/Caches/ccache"),
+        .init("ccache", .packageCaches, "ccache (~/.ccache)", "~/.ccache"),
+        .init("ccache", .packageCaches, "ccache (~/.cache)", "~/.cache/ccache"),
+        .init("sccache", .packageCaches, "sccache", "~/Library/Caches/Mozilla.sccache"),
+        .init("Coursier", .packageCaches, "Coursier (Scala)", "~/Library/Caches/Coursier"),
+        .init("cabal", .packageCaches, "cabal packages (Haskell)", "~/.cabal/packages"),
+        .init("GHCup", .packageCaches, "GHCup downloads", "~/.ghcup/cache"),
+        .init("Julia", .packageCaches, "Julia precompiled packages", "~/.julia/compiled"),
+        .init("minikube", .packageCaches, "minikube downloads", "~/.minikube/cache", selected: false),
+        .init("Helm", .packageCaches, "Helm charts cache", "~/Library/Caches/helm"),
+        .init("mise", .packageCaches, "mise downloads", "~/Library/Caches/mise"),
+        .init("asdf", .packageCaches, "asdf downloads", "~/.asdf/downloads"),
+        .init("nvm", .packageCaches, "nvm downloads", "~/.nvm/.cache"),
+        .init("Unity", .packageCaches, "Unity package cache", "~/Library/Unity/cache", selected: false),
+        .init("Foundry", .packageCaches, "Foundry cache", "~/.foundry/cache"),
+        .init("Solana", .packageCaches, "Solana tools cache", "~/.cache/solana", selected: false),
+        // Editors and IDEs (VS Code and its relatives are added below)
+        .init("JetBrains", .ideCaches, "JetBrains", "~/Library/Caches/JetBrains", mode: .children),
+        .init("JetBrains", .ideCaches, "JetBrains logs", "~/Library/Logs/JetBrains", mode: .children),
+        // AI tools: logs and caches only. Models are listed one by one further down, conversations stay.
+        .init("Ollama", .aiTools, "Ollama logs", "~/.ollama/logs"),
+        .init("Ollama", .aiTools, "Ollama cache", "~/Library/Caches/ollama"),
+        .init("Ollama", .aiTools, "Ollama app cache", "~/Library/Caches/com.electron.ollama"),
+        .init("LM Studio", .aiTools, "LM Studio server logs", "~/.lmstudio/server-logs"),
+        .init("Claude Code", .aiTools, "Claude Code debug logs", "~/.claude/debug"),
+        .init("Claude Code", .aiTools, "Claude Code shell snapshots", "~/.claude/shell-snapshots"),
+        .init("Codex CLI", .aiTools, "Codex CLI logs", "~/.codex/log"),
+        .init("Codex CLI", .aiTools, "Codex CLI conversation history", "~/.codex/sessions", selected: false, safety: .review),
+        .init("Gemini CLI", .aiTools, "Gemini CLI chats and checkpoints", "~/.gemini/tmp", selected: false, safety: .review),
+        .init("opencode", .aiTools, "opencode logs", "~/.local/share/opencode/log"),
+        .init("opencode", .aiTools, "opencode cache", "~/.cache/opencode"),
+        .init("Aider", .aiTools, "Aider cache", "~/.aider/caches"),
+        .init("Pinokio", .aiTools, "Pinokio download cache", "~/pinokio/cache", selected: false),
+        .init("Weights & Biases", .aiTools, "wandb artifact cache", "~/.cache/wandb", selected: false),
+        // Downloaded data that the tool fetches again on demand. Whole folders; models of other apps are listed one by one.
+        .init("kagglehub", .aiModels, "kagglehub downloads", "~/.cache/kagglehub", selected: false),
+        .init("NLTK", .aiModels, "NLTK data", "~/nltk_data", selected: false, safety: .safe),
+        .init("AnythingLLM", .aiModels, "AnythingLLM models", "~/Library/Application Support/anythingllm-desktop/storage/models", selected: false),
+        .init("InvokeAI", .aiModels, "InvokeAI models", "~/invokeai/models", selected: false),
+    ] + vscodeFamily.flatMap { editor in
+        vscodeParts.map { part in
+            DevFolderRule(editor.name, .ideCaches, "\(editor.name) \(part.label)",
+                          "~/Library/Application Support/\(editor.folder)/\(part.folder)")
+        }
+    }
 
     public func scan() -> [DevItem] {
         let fm = FileManager.default
@@ -191,19 +250,23 @@ public struct DevFolderScanner: Sendable {
                 let size = FileSize.of(dir)
                 guard size > 0 else { continue }
                 out.append(DevItem(id: dir.path, group: rule.group, title: rule.title, detail: env.displayPath(dir),
-                                   size: size, removal: .files([dir]), selectedByDefault: rule.selected, location: dir))
+                                   size: size, removal: .files([dir]), selectedByDefault: rule.selected, location: dir,
+                                   safetyOverride: rule.safety))
             case .children:
                 for child in fm.children(of: dir) where !child.lastPathComponent.hasPrefix(".") && !env.isExcluded(child) {
                     let size = FileSize.of(child)
                     guard size > 0 else { continue }
                     out.append(DevItem(id: child.path, group: rule.group, title: child.lastPathComponent,
                                        detail: rule.title, size: size, removal: .files([child]),
-                                       selectedByDefault: rule.selected, location: child, lastUsed: child.modificationDate))
+                                       selectedByDefault: rule.selected, location: child, lastUsed: child.modificationDate,
+                                       safetyOverride: rule.safety))
                 }
             }
         }
         out += androidItems()
         out += AIModelScanner(env: env).scan()
+        out += ToolVersionScanner(env: env).scan()
+        out += VirtualMachineDisks(env: env).scan()
         out += oldClaudeCodeVersions()
         out += bazelOutput()
         out += heapDumps()
@@ -220,14 +283,20 @@ public struct DevFolderScanner: Sendable {
         let current = (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path))
             .map { URL(fileURLWithPath: $0, relativeTo: link.deletingLastPathComponent()).standardizedFileURL.lastPathComponent }
         let newest = versions.map(\.lastPathComponent).max { VersionCompare.compare($0, $1) == .orderedAscending }
-        return versions.filter { $0.lastPathComponent != current && $0.lastPathComponent != newest && !env.isExcluded($0) }
-            .compactMap { v in
-                let size = FileSize.of(v)
-                guard size > 0 else { return nil }
-                return DevItem(id: v.path, group: .oldVersions, title: "Claude Code \(v.lastPathComponent)",
-                               detail: "Older version · in use: \(current ?? newest ?? "?")", size: size,
-                               removal: .files([v]), selectedByDefault: true, location: v, lastUsed: v.modificationDate)
+        return versions.filter { !env.isExcluded($0) }.compactMap { v in
+            let size = FileSize.of(v)
+            guard size > 0 else { return nil }
+            let name = v.lastPathComponent
+            // The version in use and the newest one are listed too, so the space adds up, but they stay.
+            if name == current || name == newest {
+                return DevItem(id: v.path, group: .oldVersions, title: "Claude Code \(name)",
+                               detail: name == current ? "In use" : "Newest version", size: size, removal: .files([v]),
+                               location: v, lastUsed: v.modificationDate, safetyOverride: .kept)
             }
+            return DevItem(id: v.path, group: .oldVersions, title: "Claude Code \(name)",
+                           detail: "Older version · in use: \(current ?? newest ?? "?")", size: size,
+                           removal: .files([v]), selectedByDefault: true, location: v, lastUsed: v.modificationDate)
+        }
     }
 
     /// Bazel's output base lives outside the home folder: /private/var/tmp/_bazel_<user>.
@@ -279,7 +348,7 @@ public struct DevFolderScanner: Sendable {
                     guard size > 0 else { continue }
                     out.append(DevItem(id: abi.path, group: .android,
                                        title: "\(api.lastPathComponent) · \(tag.lastPathComponent) · \(abi.lastPathComponent)",
-                                       detail: "System image", size: size, removal: .files([abi]), location: abi))
+                                       detail: "System image", size: size, removal: .files([abi]), location: abi, safetyOverride: .safe))
                 }
             }
         }
@@ -298,26 +367,27 @@ public struct AIModelScanner: Sendable {
     public init(env: SweepEnvironment) { self.env = env }
 
     /// Folders where each child is one model (file or folder).
-    static let folders: [(app: String, path: String)] = [
-        ("LM Studio", "~/.lmstudio/models"),
-        ("LM Studio", "~/.cache/lm-studio/models"),
-        ("GPT4All", "~/Library/Application Support/nomic.ai/GPT4All"),
-        ("Jan", "~/jan/models"),
-        ("Jan", "~/Library/Application Support/Jan/data/models"),
-        ("Draw Things", "~/Library/Containers/com.liuliu.draw-things/Data/Documents/Models"),
-        ("DiffusionBee", "~/.diffusionbee/downloads"),
-        ("MacWhisper", "~/Library/Application Support/MacWhisper/models"),
-        ("Whisper", "~/.cache/whisper"),
-        ("PyTorch Hub", "~/.cache/torch/hub/checkpoints"),
+    /// `nested`: models sit one level deeper, as <publisher>/<model> (LM Studio) or <kind>/<model> (ComfyUI).
+    static let folders: [(app: String, path: String, nested: Bool)] = [
+        ("LM Studio", "~/.lmstudio/models", true),
+        ("LM Studio", "~/.cache/lm-studio/models", true),
+        ("ComfyUI", "~/Documents/ComfyUI/models", true),
+        ("GPT4All", "~/Library/Application Support/nomic.ai/GPT4All", false),
+        ("Jan", "~/jan/models", false),
+        ("Jan", "~/Library/Application Support/Jan/data/models", false),
+        ("Draw Things", "~/Library/Containers/com.liuliu.draw-things/Data/Documents/Models", false),
+        ("DiffusionBee", "~/.diffusionbee/downloads", false),
+        ("MacWhisper", "~/Library/Application Support/MacWhisper/models", false),
+        ("Whisper", "~/.cache/whisper", false),
+        ("PyTorch Hub", "~/.cache/torch/hub/checkpoints", false),
     ]
 
     public func scan() -> [DevItem] {
         var out = ollama() + huggingFace()
         let fm = FileManager.default
-        for (app, path) in Self.folders {
+        for (app, path, nested) in Self.folders {
             let dir = env.resolve(path)
-            // LM Studio keeps models as <publisher>/<model>; list the models, not the publishers.
-            let nested = app == "LM Studio"
+            // Nested folders: list the models, not the publishers or kinds.
             let entries = nested ? fm.children(of: dir).filter(\.isDirectoryURL).flatMap { fm.children(of: $0) } : fm.children(of: dir)
             for model in entries where !model.lastPathComponent.hasPrefix(".") && !env.isExcluded(model) {
                 let size = FileSize.of(model)
@@ -456,17 +526,22 @@ public struct SimulatorScanner: Sendable {
             for d in devices {
                 // The UDID goes on a command line: accept nothing that is not a UUID.
                 guard let udid = d["udid"] as? String, UUID(uuidString: udid) != nil,
-                      let name = d["name"] as? String, (d["state"] as? String) != "Booted" else { continue }
+                      let name = d["name"] as? String else { continue }
+                let booted = (d["state"] as? String) == "Booted"
                 let available = d["isAvailable"] as? Bool ?? true
                 let dataPath = (d["dataPath"] as? String).map { URL(fileURLWithPath: $0).deletingLastPathComponent() }
                 let size = (d["dataPathSize"] as? NSNumber)?.int64Value ?? dataPath.map { FileSize.of($0) } ?? 0
                 let used = date(d["lastUsedAt"])
                 var detail = runtimeName(runtime)
-                if !available { detail += " · unavailable (runtime deleted)" }
+                if booted { detail += " · running now" }
+                else if !available { detail += " · unavailable (runtime deleted)" }
                 else if used == nil { detail += " · never launched" }
+                // A running simulator is shown but kept; one whose runtime is gone cannot start, so nothing is lost.
+                let safety: Safety? = booted ? .kept : (available ? nil : .safe)
                 out.append(DevItem(id: "sim-" + udid, group: .simulators, title: name, detail: detail, size: size,
                                    removal: .command([xcrun, "simctl", "delete", udid]),
-                                   selectedByDefault: !available, location: dataPath, lastUsed: used))
+                                   selectedByDefault: !available && !booted, location: dataPath, lastUsed: used,
+                                   safetyOverride: safety))
             }
         }
         return out.sorted { $0.size > $1.size }
@@ -712,6 +787,10 @@ public struct DevCleaner: Sendable {
         var targets: [(url: URL, size: Int64)] = []
         var report = CleanReport()
         for item in items {
+            guard item.isRemovable else {
+                report.failed.append((item.location ?? URL(fileURLWithPath: "/" + item.title), "Kept: MyOpenCleaner never removes this"))
+                continue
+            }
             switch item.removal {
             case .files(let urls):
                 // The item's size is counted once, on its first file.

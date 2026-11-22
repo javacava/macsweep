@@ -17,7 +17,7 @@ struct DeveloperView: View {
     @State private var confirmDocker = false
     @State private var message: String?
 
-    var chosen: [DevItem] { items?.filter { selected.contains($0.id) } ?? [] }
+    var chosen: [DevItem] { items?.filter { selected.contains($0.id) && $0.isRemovable } ?? [] }
     var chosenSize: Int64 { chosen.reduce(0) { $0 + $1.size } }
     var hasCommands: Bool { chosen.contains { if case .command = $0.removal { true } else { false } } }
 
@@ -31,7 +31,7 @@ struct DeveloperView: View {
     }
 
     var body: some View {
-        ModulePage(module: .developer, subtitle: "Simulators and emulators, Xcode firmware, npm and other package caches, project builds, Docker junk.") {
+        ModulePage(module: .developer, subtitle: "Simulators, Xcode, package caches, AI models and coding agents, language versions, project builds, Docker.") {
             Button(projectsRoot.map { "Projects: \($0.lastPathComponent)" } ?? "Projects folder…") {
                 let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false
                 p.message = "Where to look for node_modules, .build, target and other builds"
@@ -44,6 +44,12 @@ struct DeveloperView: View {
                 StateView(symbol: "", title: "Scanning…", message: progress, busy: true)
             } else if let items {
                 VStack(spacing: 0) {
+                    if !items.isEmpty {
+                        SafetyLegend(present: Set(items.map(\.safety))) {
+                            selected = Set(items.filter { $0.safety == .safe }.map(\.id))
+                        }
+                        Divider()
+                    }
                     List {
                         ForEach(DevItem.Group.allCases) { group in
                             let rows = items.filter { $0.group == group }
@@ -81,7 +87,8 @@ struct DeveloperView: View {
     }
 
     func section(_ group: DevItem.Group, _ rows: [DevItem]) -> some View {
-        let ids = Set(rows.map(\.id))
+        let ids = Set(rows.filter(\.isRemovable).map(\.id))
+        let removableSize = rows.filter(\.isRemovable).reduce(0) { $0 + $1.size }
         let all = Binding(get: { ids.isSubset(of: selected) },
                           set: { on in if on { selected.formUnion(ids) } else { selected.subtract(ids) } })
         return DisclosureGroup(isExpanded: Binding(get: { expanded.contains(group) },
@@ -90,14 +97,14 @@ struct DeveloperView: View {
             if group == .builds {
                 Button("Select projects unchanged for over 30 days") {
                     let cutoff = Date().addingTimeInterval(-30 * 86_400)
-                    selected.formUnion(rows.filter { ($0.lastUsed ?? .distantFuture) < cutoff }.map(\.id))
+                    selected.formUnion(rows.filter { $0.isRemovable && ($0.lastUsed ?? .distantFuture) < cutoff }.map(\.id))
                 }
                 .controlSize(.small)
             }
             if group == .simulators {
                 Button("Select those not launched for over 90 days") {
                     let cutoff = Date().addingTimeInterval(-90 * 86_400)
-                    selected.formUnion(rows.filter { ($0.lastUsed ?? .distantPast) < cutoff }.map(\.id))
+                    selected.formUnion(rows.filter { $0.isRemovable && ($0.lastUsed ?? .distantPast) < cutoff }.map(\.id))
                 }
                 .controlSize(.small)
             }
@@ -105,25 +112,36 @@ struct DeveloperView: View {
             if rows.count > 300 { Text("…\(rows.count - 300) more").foregroundStyle(.secondary) }
         } label: {
             HStack {
-                Toggle("", isOn: all).labelsHidden().toggleStyle(.checkbox)
+                if ids.isEmpty {
+                    Image(systemName: Safety.kept.symbol).foregroundStyle(.secondary).frame(width: 14)
+                } else {
+                    Toggle("", isOn: all).labelsHidden().toggleStyle(.checkbox)
+                }
                 Image(systemName: group.symbol).frame(width: 22).foregroundStyle(Module.developer.tint)
                 Text(group.title).font(.headline)
                 Text("\(rows.count)").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                SizeText(bytes: rows.reduce(0) { $0 + $1.size })
+                // Kept rows are not counted: that space cannot be freed here.
+                SizeText(bytes: ids.isEmpty ? rows.reduce(0) { $0 + $1.size } : removableSize)
             }
         }
     }
 
     func row(_ item: DevItem) -> some View {
         HStack(spacing: 10) {
-            Toggle("", isOn: member($selected, item.id)).labelsHidden().toggleStyle(.checkbox)
+            if item.isRemovable {
+                Toggle("", isOn: member($selected, item.id)).labelsHidden().toggleStyle(.checkbox)
+            } else {
+                Image(systemName: Safety.kept.symbol).foregroundStyle(.secondary).frame(width: 14)
+                    .help("Kept: MyOpenCleaner does not remove this")
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).lineLimit(1).truncationMode(.middle)
                 Text(item.detail + (item.lastUsed.map { " · " + $0.formatted(date: .abbreviated, time: .omitted) } ?? ""))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
             Spacer()
+            SafetyBadge(safety: item.safety)
             SizeText(bytes: item.size)
             if let url = item.location {
                 Button { AppState.reveal(url) } label: { Image(systemName: "magnifyingglass") }
@@ -183,7 +201,9 @@ struct DeveloperView: View {
             self.docker = await AppState.background { docker.state() }
             let all = (folders + sims + builds).sorted { $0.size > $1.size }
             items = all
-            selected = Set(all.filter(\.selectedByDefault).map(\.id))
+            selected = Set(all.filter { $0.selectedByDefault && $0.isRemovable }.map(\.id))
+            // Screenshots: open the groups that show all three marks.
+            if Demo.active != nil { expanded = [.toolVersions, .aiTools] }
             busy = false
         }
     }

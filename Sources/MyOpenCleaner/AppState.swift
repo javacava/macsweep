@@ -23,7 +23,7 @@ enum Module: String, CaseIterable, Identifiable, Hashable {
         case .leftovers: "App Leftovers"
         case .largeOld: "Large & Old Files"
         case .duplicates: "Duplicates"
-        case .similar: "Similar Photos"
+        case .similar: "Similar Media"
         case .spaceMap: "Space Map"
         case .monitor: "Mac Health"
         case .battery: "Battery"
