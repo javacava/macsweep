@@ -1,8 +1,11 @@
 # Builds MyOpenCleaner on GitHub's own Macs and publishes it as a release.
 #
-# Push a tag such as v1.0.0 to publish a release. Run it by hand
-# (Actions → Release → Run workflow) to only build and test; the app is then
-# attached to the run as an artifact and nothing is published.
+# Push a tag such as v1.0.0 to publish a release with a .dmg and a .zip. Run it by hand
+# (Actions → Release → Run workflow) to only build and test; the app is then attached to
+# the run as an artifact and nothing is published.
+#
+# Running it by hand with "Add a DMG to an existing release" set to a tag packs the app
+# that release already ships into a .dmg and adds it, without rebuilding the app.
 #
 # The app is signed ad hoc: it carries no developer certificate, name or team ID.
 name: Release
@@ -11,16 +14,22 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      add_dmg_to:
+        description: "Add a DMG to an existing release, e.g. v1.0.0. Leave empty to build and test only."
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref }}-${{ inputs.add_dmg_to }}
   cancel-in-progress: false
 
 jobs:
   release:
+    if: github.event_name == 'push' || inputs.add_dmg_to == ''
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -66,15 +75,21 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           ZIP="MyOpenCleaner-${VERSION}.zip"
+          DMG="MyOpenCleaner-${VERSION}.dmg"
           ditto -c -k --sequesterRsrc --keepParent dist/MyOpenCleaner.app "$ZIP"
+          scripts/make_dmg.sh dist/MyOpenCleaner.app "$DMG"
           shasum -a 256 "$ZIP" > "$ZIP.sha256"
-          cat "$ZIP.sha256"
+          shasum -a 256 "$DMG" > "$DMG.sha256"
+          cat "$ZIP.sha256" "$DMG.sha256"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: MyOpenCleaner-${{ steps.version.outputs.version }}
           path: |
+            ${{ steps.package.outputs.dmg }}
+            ${{ steps.package.outputs.dmg }}.sha256
             ${{ steps.package.outputs.zip }}
             ${{ steps.package.outputs.zip }}.sha256
 
@@ -83,25 +98,55 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ZIP: ${{ steps.package.outputs.zip }}
+          DMG: ${{ steps.package.outputs.dmg }}
         run: |
-          SHA="$(cut -d' ' -f1 "$ZIP.sha256")"
-          cat > notes.md <<EOF
-          ## Download
-
-          **[$ZIP](https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/$ZIP)** — one app for Apple silicon and Intel Macs, macOS 14 Sonoma or later.
-
-          1. Unzip it and drag **MyOpenCleaner** to **Applications**.
-          2. Open it. macOS will say it cannot check the app for malicious software, because the app is not notarized by Apple.
-          3. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to MyOpenCleaner. You only do this once.
-
-          Prefer Terminal? \`xattr -dr com.apple.quarantine /Applications/MyOpenCleaner.app\` does the same.
-
-          The app was built from this tag's source by GitHub Actions and is signed ad hoc. You can always build it yourself instead: \`./build.sh --install\`.
-
-          SHA-256: \`$SHA\`
-          EOF
-          gh release create "$GITHUB_REF_NAME" "$ZIP" "$ZIP.sha256" \
+          scripts/release_notes.sh "$GITHUB_REF_NAME" "$DMG" "$ZIP" > notes.md
+          gh release create "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" "$ZIP" "$ZIP.sha256" \
             --title "MyOpenCleaner ${GITHUB_REF_NAME#v}" \
             --notes-file notes.md \
-            --generate-notes \
             --verify-tag
+
+  add-dmg:
+    if: github.event_name == 'workflow_dispatch' && inputs.add_dmg_to != ''
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.add_dmg_to }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download the release's app
+        id: download
+        run: |
+          V="${TAG#v}"
+          ZIP="MyOpenCleaner-${V}.zip"
+          mkdir -p release
+          gh release download "$TAG" --pattern "$ZIP" --pattern "$ZIP.sha256" --dir release
+          (cd release && shasum -a 256 -c "$ZIP.sha256")
+          ditto -x -k "release/$ZIP" unpacked
+          APP=unpacked/MyOpenCleaner.app
+          codesign --verify --strict "$APP"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "$V"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "zip=release/$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Make the DMG
+        id: package
+        env:
+          VERSION: ${{ steps.download.outputs.version }}
+        run: |
+          DMG="MyOpenCleaner-${VERSION}.dmg"
+          scripts/make_dmg.sh unpacked/MyOpenCleaner.app "$DMG"
+          shasum -a 256 "$DMG" > "$DMG.sha256"
+          cat "$DMG.sha256"
+          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
+
+      - name: Add it to the release
+        env:
+          DMG: ${{ steps.package.outputs.dmg }}
+          ZIP: ${{ steps.download.outputs.zip }}
+        run: |
+          gh release upload "$TAG" "$DMG" "$DMG.sha256" --clobber
+          scripts/release_notes.sh "$TAG" "$DMG" "$ZIP" > notes.md
+          gh release edit "$TAG" --notes-file notes.md

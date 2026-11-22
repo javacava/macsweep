@@ -14,6 +14,8 @@ APP="dist/MyOpenCleaner.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MyOpenCleaner" "$APP/Contents/MacOS/MyOpenCleaner"
+# Drop debug symbols: they record the build machine's folder paths and are not needed to run.
+strip -S "$APP/Contents/MacOS/MyOpenCleaner"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 if [ -n "${VERSION:-}" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
