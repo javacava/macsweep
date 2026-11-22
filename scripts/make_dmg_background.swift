@@ -50,8 +50,9 @@ func render(scale: CGFloat, to path: String) {
         str.draw(at: NSPoint(x: (W - sz.width) / 2, y: top(centerY) - sz.height / 2))
     }
     text("Drag MyOpenCleaner to Applications", size: 21, weight: .semibold, color: NSColor(white: 0.97, alpha: 1), centerY: 52)
-    text("Then open it from your Applications folder.", size: 13, weight: .regular,
-         color: NSColor(white: 0.62, alpha: 1), centerY: 82)
+    // The app is not notarized, so the first launch needs one click on Open Anyway. Say so up front.
+    text("First launch: System Settings → Privacy & Security → Open Anyway", size: 13, weight: .regular,
+         color: NSColor(white: 0.7, alpha: 1), centerY: 82)
 
     // The arrow: a soft arc from the app to Applications, violet into cyan.
     let start = NSPoint(x: appX + 84, y: top(iconY)), end = NSPoint(x: appsX - 92, y: top(iconY))
