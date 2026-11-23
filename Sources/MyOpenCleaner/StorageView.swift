@@ -107,6 +107,10 @@ struct StorageView: View {
             // Screenshots: open the biggest tool so the side panel shows items and their marks.
             if Demo.active != nil, !TourDriver.shared.active, let top = result.owners.first(where: { $0.area == .ai }) ?? result.owners.first {
                 focus = .owner(top.id)
+                // `DEMO_STORAGE_AREA=projects` raises a whole area instead, to check how a raised block looks.
+                if let a = ProcessInfo.processInfo.environment["DEMO_STORAGE_AREA"].flatMap(SupportedTools.Area.init(rawValue:)) {
+                    focus = .area(a)
+                }
             }
         }
     }
@@ -210,8 +214,9 @@ struct DiscTop: Shape {
 struct DiscWalls: Shape {
     var start: Double, end: Double, tilt: Double, depth: Double
     let inner: CGFloat, outer: CGFloat
-    /// The cut ends show only on a raised slice; on the others they would draw stripes between neighbours.
-    var caps = false
+    /// The cut ends show only at the edges of a raised block; elsewhere they would draw stripes between neighbours.
+    var startCap = false
+    var endCap = false
     /// How much taller the walls are than the disc: a raised slice stands on the floor like a column.
     var extra = 0.0
 
@@ -233,7 +238,7 @@ struct DiscWalls: Shape {
             p.addLines(top + down(top).reversed())
             p.closeSubpath()
         }
-        for a in [start, end] where caps {
+        for (a, on) in [(start, startCap), (end, endCap)] where on {
             let q = [g.point(c, inner, a), g.point(c, outer, a)]
             p.addLines(q + down(q).reversed())
             p.closeSubpath()
@@ -387,6 +392,12 @@ struct StorageRings: View {
             // Walls first, then the top faces over them: the tops all lie in one plane and never overlap,
             // so a big slice can never paint over its neighbours. Raised slices go above everything.
             ForEach(all) { s in
+                if isRaised(s) {
+                    // Where the raised slice sat stays filled, darker, so the disc never shows a hole.
+                    wedge(s, part: .walls, socket: true).zIndex(zOrder(s, part: .walls, socket: true))
+                    wedge(s, part: .top, socket: true).zIndex(zOrder(s, part: .top, socket: true))
+                    wedge(s, part: .glow).zIndex(zOrder(s, part: .glow))
+                }
                 wedge(s, part: .walls).zIndex(zOrder(s, part: .walls))
                 wedge(s, part: .top).zIndex(zOrder(s, part: .top))
             }
@@ -420,15 +431,16 @@ struct StorageRings: View {
         .transaction { t in if TourDriver.shared.active { t.animation = nil; t.disablesAnimations = true } }
     }
 
-    enum Part { case walls, top }
+    enum Part { case glow, walls, top }
 
     /// Layers: walls (inner rings first, so the outer rim's wall is in front below the disc), then top faces,
     /// then whatever is raised, again walls under tops.
-    func zOrder(_ s: Slice, part: Part) -> Double {
+    func zOrder(_ s: Slice, part: Part, socket: Bool = false) -> Double {
         let r = Double(Self.radii[s.ring].0 + Self.radii[s.ring].1) / 2
         let y = -cos(s.mid * .pi / 180) * r + 300          // 0…600, back to front
-        let base: Double = isRaised(s) ? 20_000 : 0
+        let base: Double = isRaised(s) && !socket ? 20_000 : 0
         switch part {
+        case .glow: return base - 1_000 + y        // under the raised block, over everything else
         case .walls: return base + Double(s.ring) * 1_000 + y
         case .top: return base + 10_000 + y
         }
@@ -439,7 +451,8 @@ struct StorageRings: View {
         withAnimation(.spring(response: 1.4, dampingFraction: 0.82)) { grow = 1 }
     }
 
-    @ViewBuilder func wedge(_ s: Slice, part: Part) -> some View {
+    /// `socket`: the dark place a raised slice left in the disc, drawn where the slice was.
+    @ViewBuilder func wedge(_ s: Slice, part: Part, socket: Bool = false) -> some View {
         let (inner, outer) = Self.radii[s.ring]
         let span = max(s.end - s.start - (s.ring == 2 ? 0.25 : Self.gap), 0)
         let start = s.start + (s.end - s.start - span) / 2
@@ -448,7 +461,7 @@ struct StorageRings: View {
         let tilt = Self.tilt + (1 - Self.tilt) * (1 - gv)     // lies down as it appears
         let depth = (s.ring == 2 ? Self.depth * 0.8 : Self.depth) * gv
         let mode = raiseMode(s)
-        let l = lift(s)
+        let l = socket ? 0 : lift(s)
         let raised = l > 0.001
         let dim = isDimmed(s)
         let d = tour.active ? dimAmount(s) : (dim ? 1 : 0)
@@ -458,18 +471,22 @@ struct StorageRings: View {
         // A slice wider than half the disc only rises; sliding it sideways would look like the disc breaking.
         let slide: CGFloat = arc.upperBound - arc.lowerBound < 180 ? 9 * l : 0
         let rise: CGFloat = 14 * l
-        // A raised slice is drawn above everything, so its walls must stop where something would hide them:
-        // a tool lifted at the back of the disc has the inner ring in front of it, so its walls end at the
-        // disc's surface; anywhere else nothing is in front, and they reach the bottom of the disc.
-        let behindInner = s.ring > 0 && mode == .owner && cos(s.mid * .pi / 180) > 0
-        let extra = raised ? (behindInner ? Double(rise) - depth : Double(rise)) : 0
+        // A raised slice stands on its socket: its walls reach down to the disc's surface and no further,
+        // so they never cover anything in front of it.
+        let extra = raised ? Double(rise) + 4 - depth : 0
+        let startCap = raised && abs(s.start - arc.lowerBound) < 0.01
+        let endCap = raised && abs(s.end - arc.upperBound) < 0.01
         ZStack {
-            if part == .walls {
-                DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised, extra: extra)
+            if part == .glow {
+                // One soft glow under the whole raised block; a shadow per slice would wash over its walls.
+                DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
+                    .fill(s.color.opacity(0.55 * min(l, 1)))
+                    .blur(radius: 16)
+            } else if part == .walls {
+                DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, startCap: startCap, endCap: endCap, extra: extra)
                     .fill(s.color)
-                    .overlay(DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised, extra: extra)
+                    .overlay(DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, startCap: startCap, endCap: endCap, extra: extra)
                         .fill(LinearGradient(colors: [.black.opacity(0.25), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)))
-                    .shadow(color: s.color.opacity(0.7 * min(l, 1)), radius: 14 * min(l, 1), y: 6 * min(l, 1))
             } else {
                 // Opaque: a see-through top would let the walls underneath show as rings inside rings.
                 DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
@@ -481,8 +498,8 @@ struct StorageRings: View {
             }
         }
         // Dimmed slices stay opaque: see-through walls would show the disc's insides.
-        .saturation(1 - 0.75 * d)
-        .brightness(-0.22 * d)
+        .saturation(socket ? 0.45 : 1 - 0.75 * d)
+        .brightness(socket ? -0.38 : -0.22 * d)
         .offset(x: sin(midRad) * slide, y: -cos(midRad) * slide * Self.tilt - rise)
         .animation(.spring(response: 1.25, dampingFraction: 0.84).delay(Double(s.ring) * 0.1 + s.start / 360 * 0.35), value: grow)
         .animation(.spring(response: 0.34, dampingFraction: 0.62), value: raised)
