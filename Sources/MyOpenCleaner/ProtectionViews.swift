@@ -167,6 +167,7 @@ struct PrivacyView: View {
     @State private var sizes: [String: Int64] = [:]
     @State private var selected = Set<String>()
     @State private var wifi: [String] = []
+    @State private var keychain: [KeychainEntry] = []
     @State private var busy = false
     @State private var message: String?
     @State private var confirm = false
@@ -196,6 +197,7 @@ struct PrivacyView: View {
                                 }
                             }
                         }
+                        if !keychain.isEmpty { keychainSection }
                         Section("Saved Wi‑Fi networks (\(wifi.count))") {
                             ForEach(wifi, id: \.self) { ssid in
                                 HStack {
@@ -231,11 +233,14 @@ struct PrivacyView: View {
         busy = true; items = nil
         let env = state.env, runner = state.runner
         Task {
-            let (found, s, w) = await AppState.background { () -> ([PrivacyItem], [String: Int64], [String]) in
+            let (found, s, w, k) = await AppState.background { () -> ([PrivacyItem], [String: Int64], [String], [KeychainEntry]) in
                 let f = PrivacyScanner(env: env).scan()
-                return (f, Dictionary(uniqueKeysWithValues: f.map { ($0.id, $0.size) }), WiFiNetworks(runner: runner).list())
+                // Apps anywhere on the Mac count as installed, so their keychain entries are never listed.
+                let installed = Set(AppScanner.installedApps(env: env).map(\.bundleID)).union(AppScanner.spotlightBundleIDs(runner: runner))
+                return (f, Dictionary(uniqueKeysWithValues: f.map { ($0.id, $0.size) }), WiFiNetworks(runner: runner).list(),
+                        KeychainReview(runner: runner).staleEntries(installed: installed))
             }
-            items = found; sizes = s; wifi = w; selected = []; busy = false
+            items = found; sizes = s; wifi = w; keychain = k; selected = []; busy = false
         }
     }
 
@@ -255,6 +260,43 @@ struct PrivacyView: View {
             busy = false
             scan()
         }
+    }
+
+    /// Saved passwords of apps that are gone. Shown only: MyOpenCleaner never deletes keychain entries.
+    var keychainSection: some View {
+        Section {
+            Text("Only names are read, never passwords. MyOpenCleaner does not delete keychain entries: find one in Keychain Access and delete it there if you no longer need it.")
+                .font(.caption).foregroundStyle(.secondary)
+            ForEach(keychain) { entry in
+                HStack(spacing: 10) {
+                    Image(systemName: "key").foregroundStyle(.secondary).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(entry.service).lineLimit(1).truncationMode(.middle)
+                        Text([entry.account, entry.modified.map { "changed " + $0.formatted(date: .abbreviated, time: .omitted) }]
+                                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }
+                    Spacer()
+                    SafetyBadge(safety: .kept)
+                    Button("Find in Keychain Access") { Self.findInKeychainAccess(entry.service) }
+                        .controlSize(.small)
+                        .help("Copies the name and opens Keychain Access: paste it into the search field")
+                }
+                .padding(.vertical, 2)
+            }
+        } header: {
+            Text("Keychain entries of removed apps (\(keychain.count))")
+        }
+    }
+
+    /// Keychain Access cannot be pointed at one entry, so the name goes to the clipboard for its search field.
+    static func findInKeychainAccess(_ service: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(service, forType: .string)
+        if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.keychainaccess") {
+            NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+        }
+        AppState.shared.toast = "Copied “\(service)”. Paste it into Keychain Access's search field."
     }
 
     func forget(_ ssid: String) {

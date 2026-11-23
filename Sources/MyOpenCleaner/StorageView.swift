@@ -379,8 +379,11 @@ struct StorageRings: View {
         ZStack {
             OrbitBackdrop(radius: 236, tilt: Self.tilt + (1 - Self.tilt) * (1 - g), clock: tour.active ? tour.clock : nil)
                 .offset(y: Self.depth * g / 2)
+            // Walls first, then the top faces over them: the tops all lie in one plane and never overlap,
+            // so a big slice can never paint over its neighbours. Raised slices go above everything.
             ForEach(all) { s in
-                wedge(s).zIndex(zOrder(s))
+                wedge(s, part: .walls).zIndex(zOrder(s, part: .walls))
+                wedge(s, part: .top).zIndex(zOrder(s, part: .top))
             }
             CenterLabel(overview: overview, focus: focus, override: summary(currentHover))
                 .frame(width: 170)
@@ -412,11 +415,18 @@ struct StorageRings: View {
         .transaction { t in if TourDriver.shared.active { t.animation = nil; t.disablesAnimations = true } }
     }
 
-    /// Back to front, so nearer walls cover farther ones; anything raised comes to the top.
-    func zOrder(_ s: Slice) -> Double {
+    enum Part { case walls, top }
+
+    /// Layers: walls (inner rings first, so the outer rim's wall is in front below the disc), then top faces,
+    /// then whatever is raised, again walls under tops.
+    func zOrder(_ s: Slice, part: Part) -> Double {
         let r = Double(Self.radii[s.ring].0 + Self.radii[s.ring].1) / 2
-        let y = -cos(s.mid * .pi / 180) * r
-        return (isRaised(s) ? 5_000 : 0) + y + 300
+        let y = -cos(s.mid * .pi / 180) * r + 300          // 0…600, back to front
+        let base: Double = isRaised(s) ? 20_000 : 0
+        switch part {
+        case .walls: return base + Double(s.ring) * 1_000 + y
+        case .top: return base + 10_000 + y
+        }
     }
 
     func animateIn() {
@@ -424,7 +434,7 @@ struct StorageRings: View {
         withAnimation(.spring(response: 1.4, dampingFraction: 0.82)) { grow = 1 }
     }
 
-    @ViewBuilder func wedge(_ s: Slice) -> some View {
+    @ViewBuilder func wedge(_ s: Slice, part: Part) -> some View {
         let (inner, outer) = Self.radii[s.ring]
         let span = max(s.end - s.start - (s.ring == 2 ? 0.25 : Self.gap), 0)
         let start = s.start + (s.end - s.start - span) / 2
@@ -444,19 +454,25 @@ struct StorageRings: View {
         let slide: CGFloat = arc.upperBound - arc.lowerBound < 180 ? 9 * l : 0
         let rise: CGFloat = 14 * l
         ZStack {
-            DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised)
-                .fill(s.color)
-                .overlay(DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised)
-                    .fill(LinearGradient(colors: [.black.opacity(0.25), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)))
-            DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
-                .fill(LinearGradient(colors: [s.color.opacity(1), s.color.opacity(0.82)], startPoint: .topLeading, endPoint: .bottomTrailing))
-            DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
-                .stroke(.white.opacity(0.16 + 0.54 * min(l, 1)), lineWidth: 0.6 + 0.8 * min(l, 1))
+            if part == .walls {
+                DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised)
+                    .fill(s.color)
+                    .overlay(DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised)
+                        .fill(LinearGradient(colors: [.black.opacity(0.25), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)))
+                    .shadow(color: s.color.opacity(0.7 * min(l, 1)), radius: 14 * min(l, 1), y: 6 * min(l, 1))
+            } else {
+                // Opaque: a see-through top would let the walls underneath show as rings inside rings.
+                DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
+                    .fill(s.color)
+                    .overlay(DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
+                        .fill(LinearGradient(colors: [.white.opacity(0.1), .black.opacity(0.14)], startPoint: .topLeading, endPoint: .bottomTrailing)))
+                DiscTop(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer)
+                    .stroke(.white.opacity(0.16 + 0.54 * min(l, 1)), lineWidth: 0.6 + 0.8 * min(l, 1))
+            }
         }
         // Dimmed slices stay opaque: see-through walls would show the disc's insides.
         .saturation(1 - 0.75 * d)
         .brightness(-0.22 * d)
-        .shadow(color: s.color.opacity(0.7 * min(l, 1)), radius: 14 * min(l, 1), y: 6 * min(l, 1))
         .offset(x: sin(midRad) * slide, y: -cos(midRad) * slide * Self.tilt - rise)
         .animation(.spring(response: 1.25, dampingFraction: 0.84).delay(Double(s.ring) * 0.1 + s.start / 360 * 0.35), value: grow)
         .animation(.spring(response: 0.34, dampingFraction: 0.62), value: raised)

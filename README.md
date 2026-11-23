@@ -105,7 +105,7 @@ git push origin v1.0.0
 | Page | What it does |
 |---|---|
 | **Malware** | Also lists the other places code can start from: cron jobs, non-stock periodic scripts, suspicious lines in shell startup files, browser extensions (Chrome, Edge, Brave, Arc, Vivaldi, Firefox), Quick Look and Spotlight plug-ins, login authorization plug-ins, kernel and system extensions, and library injection through launch items. These are shown and revealed in Finder, never removed automatically. Shows the state of the Mac's own protection (FileVault, System Integrity Protection, Gatekeeper, firewall, XProtect definitions, automatic security updates) with a link to fix each one. Checks every launch agent and daemon against known adware and miner families, and flags suspicious ones: programs in `/tmp`, hidden folders, fake Apple names, unsigned binaries with random names. Also finds launch items whose app is gone. |
-| **Privacy** | Browsing history, cookies and autofill for Safari, Chrome, Edge, Brave and Firefox (every profile), recent items, saved Wi‑Fi networks. Passwords and bookmarks are never touched. |
+| **Privacy** | Browsing history, cookies and autofill for Safari, Chrome, Edge, Brave and Firefox (every profile), recent items, saved Wi‑Fi networks. Lists keychain entries of apps you removed (names only, read with `security dump-keychain` without secrets) so you can delete them in Keychain Access; MyOpenCleaner itself never deletes keychain entries. Passwords and bookmarks are never touched. |
 | **Shredder** | Drop files or folders on the window or the Dock icon. Contents are overwritten with random data (1, 3 or 7 passes) and deleted without going to the Trash. |
 
 ### Performance

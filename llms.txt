@@ -28,7 +28,7 @@ Platform: macOS 14 Sonoma or later, Apple silicon and Intel. Download: https://g
 - Developer: simulators and runtimes, Xcode data, Metal toolchain, Android emulators, package and IDE caches, old Claude Code versions, language versions (the default stays), AI tool and coding agent caches, AI models one by one, VM and container disks (shown, never removed), Java heap dumps, git-aware project build folders, Docker prune.
 - Cloud Files: keep large iCloud Drive files in the cloud only.
 - Malware: known adware families, suspicious and broken launch items, other persistence places, macOS protection status.
-- Privacy: browser history, cookies and autofill (never passwords), recent items, saved Wi-Fi networks.
+- Privacy: browser history, cookies and autofill (never passwords), recent items, saved Wi-Fi networks, and a read-only list of keychain entries left by removed apps (names only; deleted by the user in Keychain Access).
 - Shredder, Maintenance tasks, Launch Items manager.
 - Uninstaller with leftovers and reset, Updater for Sparkle apps, App Leftovers.
 - Large & Old Files (including virtual machines), Duplicates (SHA-256), Similar Media (photos by perceptual hash, videos by length and three frames), Space Map.
