@@ -212,17 +212,22 @@ struct DiscWalls: Shape {
     let inner: CGFloat, outer: CGFloat
     /// The cut ends show only on a raised slice; on the others they would draw stripes between neighbours.
     var caps = false
+    /// How much taller the walls are than the disc: a raised slice stands on the floor like a column.
+    var extra = 0.0
 
-    var animatableData: AnimatablePair<AnimatablePair<Double, Double>, AnimatablePair<Double, Double>> {
-        get { AnimatablePair(AnimatablePair(start, end), AnimatablePair(tilt, depth)) }
-        set { start = newValue.first.first; end = newValue.first.second; tilt = newValue.second.first; depth = newValue.second.second }
+    var animatableData: AnimatablePair<AnimatablePair<Double, Double>, AnimatablePair<Double, AnimatablePair<Double, Double>>> {
+        get { AnimatablePair(AnimatablePair(start, end), AnimatablePair(tilt, AnimatablePair(depth, extra))) }
+        set {
+            start = newValue.first.first; end = newValue.first.second
+            tilt = newValue.second.first; depth = newValue.second.second.first; extra = newValue.second.second.second
+        }
     }
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
         guard end > start, depth > 0.1 else { return p }
         let g = DiscGeometry(tilt: tilt, depth: depth), c = CGPoint(x: rect.midX, y: rect.midY - depth / 2)
-        func down(_ pts: [CGPoint]) -> [CGPoint] { pts.map { CGPoint(x: $0.x, y: $0.y + depth) } }
+        func down(_ pts: [CGPoint]) -> [CGPoint] { pts.map { CGPoint(x: $0.x, y: $0.y + depth + extra) } }
         for r in [outer, inner] {
             let top = g.arc(c, r, from: start, to: end)
             p.addLines(top + down(top).reversed())
@@ -453,11 +458,16 @@ struct StorageRings: View {
         // A slice wider than half the disc only rises; sliding it sideways would look like the disc breaking.
         let slide: CGFloat = arc.upperBound - arc.lowerBound < 180 ? 9 * l : 0
         let rise: CGFloat = 14 * l
+        // A raised slice is drawn above everything, so its walls must stop where something would hide them:
+        // a tool lifted at the back of the disc has the inner ring in front of it, so its walls end at the
+        // disc's surface; anywhere else nothing is in front, and they reach the bottom of the disc.
+        let behindInner = s.ring > 0 && mode == .owner && cos(s.mid * .pi / 180) > 0
+        let extra = raised ? (behindInner ? Double(rise) - depth : Double(rise)) : 0
         ZStack {
             if part == .walls {
-                DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised)
+                DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised, extra: extra)
                     .fill(s.color)
-                    .overlay(DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised)
+                    .overlay(DiscWalls(start: start, end: end, tilt: tilt, depth: depth, inner: inner, outer: outer, caps: raised, extra: extra)
                         .fill(LinearGradient(colors: [.black.opacity(0.25), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)))
                     .shadow(color: s.color.opacity(0.7 * min(l, 1)), radius: 14 * min(l, 1), y: 6 * min(l, 1))
             } else {
