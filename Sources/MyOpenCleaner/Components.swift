@@ -297,3 +297,26 @@ extension Safety {
         }
     }
 }
+
+/// A checkbox above a list that selects or clears every row, with how many rows there are and their size.
+struct SelectAllBar<ID: Hashable>: View {
+    let ids: [ID]
+    let size: Int64
+    @Binding var selected: Set<ID>
+    var note: String? = nil
+
+    var all: Binding<Bool> {
+        Binding(get: { !ids.isEmpty && Set(ids).isSubset(of: selected) },
+                set: { on in if on { selected.formUnion(ids) } else { selected.subtract(ids) } })
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle("Select all", isOn: all).toggleStyle(.checkbox)
+            Text("\(ids.count) items · \(FileSize.format(size))").font(.callout).foregroundStyle(.secondary)
+            Spacer()
+            if let note { Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.trailing) }
+        }
+        .padding(.horizontal, 20).padding(.vertical, 8)
+    }
+}

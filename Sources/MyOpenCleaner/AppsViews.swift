@@ -105,9 +105,21 @@ struct UninstallerView: View {
                                 Text("\(app.name).app"); Spacer(); SizeText(bytes: plan.appSize)
                             }
                         }
-                        Section("Related files (\(plan.leftovers.count))") {
+                        Section {
                             ForEach(plan.leftovers) { l in
                                 FileRow(isOn: member($selectedLeftovers, l.id), url: l.url, detail: l.location, size: l.size)
+                            }
+                        } header: {
+                            HStack {
+                                Text("Related files (\(plan.leftovers.count))")
+                                Spacer()
+                                Toggle("Select all", isOn: Binding(
+                                    get: { !plan.leftovers.isEmpty && Set(plan.leftovers.map(\.id)).isSubset(of: selectedLeftovers) },
+                                    set: { on in
+                                        if on { selectedLeftovers.formUnion(plan.leftovers.map(\.id)) }
+                                        else { selectedLeftovers.subtract(plan.leftovers.map(\.id)) }
+                                    }))
+                                .toggleStyle(.checkbox).font(.callout)
                             }
                         }
                     }
@@ -186,8 +198,9 @@ struct LeftoversView: View {
                     StateView(symbol: "checkmark.seal", title: "No leftovers found")
                 } else {
                     VStack(spacing: 0) {
-                        Text("Check the list: some files belong to tools that have no separate .app.")
-                            .font(.callout).foregroundStyle(.secondary).padding(8)
+                        SelectAllBar(ids: items.map(\.id), size: items.reduce(0) { $0 + $1.size }, selected: $selected,
+                                     note: "Check the list: some files belong to tools that have no separate .app.")
+                        Divider()
                         List(items) { l in
                             FileRow(isOn: member($selected, l.id), url: l.url, detail: l.location, size: l.size)
                         }

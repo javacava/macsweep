@@ -46,6 +46,9 @@ struct LargeOldView: View {
                         }
                     }
                     .pickerStyle(.segmented).padding(8)
+                    SelectAllBar(ids: shown.map(\.id), size: shown.reduce(0) { $0 + $1.size }, selected: $selected,
+                                 note: kind == nil ? nil : "Only the files shown: \(kind!.title.lowercased())")
+                    Divider()
                     List(shown) { f in
                         FileRow(isOn: member($selected, f.id), url: f.url,
                                 detail: state.display(f.url.deletingLastPathComponent()) + (f.accessed.map { " · opened " + $0.formatted(date: .abbreviated, time: .omitted) } ?? ""),
@@ -456,6 +459,9 @@ struct CloudView: View {
             if let files {
                 if files.isEmpty { StateView(symbol: "checkmark.icloud", title: "No large local copies") } else {
                     VStack(spacing: 0) {
+                        SelectAllBar(ids: files.map(\.id), size: files.reduce(0) { $0 + $1.entry.size }, selected: $selected,
+                                     note: "Files stay in the cloud and download again when you open them.")
+                        Divider()
                         List(files) { f in
                             FileRow(isOn: member($selected, f.id), url: f.entry.url, detail: f.provider.rawValue, size: f.entry.size)
                         }
