@@ -116,8 +116,11 @@ public protocol FileRemoving: Sendable {
 
 public struct SystemFileRemover: FileRemoving {
     let runner: CommandRunning
+    let home: URL
 
-    public init(runner: CommandRunning = ProcessRunner()) { self.runner = runner }
+    public init(runner: CommandRunning = ProcessRunner(), home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+        self.runner = runner; self.home = home
+    }
 
     public func moveToTrash(_ url: URL) throws -> URL? {
         var result: NSURL?
@@ -125,26 +128,30 @@ public struct SystemFileRemover: FileRemoving {
             try FileManager.default.trashItem(at: url, resultingItemURL: &result)
             return result as URL?
         } catch {
-            // An app installed by a .pkg belongs to the administrator: like Finder, ask for the password.
-            guard FinderTrash.isNeeded(for: url, after: error) else { throw error }
-            return try FinderTrash(runner: runner).trash(url)
+            // An app installed by a .pkg belongs to the administrator: ask for the password, like Finder does.
+            guard AdminTrash.isNeeded(for: url, after: error) else { throw error }
+            return try AdminTrash(runner: runner, home: home).trash(url)
         }
     }
 
     public func removePermanently(_ url: URL) throws {
         do { try FileManager.default.removeItem(at: url) } catch {
-            // Never delete an administrator's app outright: it goes to the Trash through Finder instead.
-            guard FinderTrash.isNeeded(for: url, after: error) else { throw error }
-            _ = try FinderTrash(runner: runner).trash(url)
+            // Never delete an administrator's app outright: it goes to the Trash instead, after the password.
+            guard AdminTrash.isNeeded(for: url, after: error) else { throw error }
+            _ = try AdminTrash(runner: runner, home: home).trash(url)
         }
     }
 }
 
-/// Moves an app the user may not move (installed by a .pkg, owned by root) to the Trash the way Finder does:
-/// by asking Finder, which asks for an administrator's password and keeps Put Back working.
-public struct FinderTrash: Sendable {
+/// Moves an app the user may not move (installed by a .pkg, owned by root) to the user's Trash after macOS asks
+/// for an administrator's password. The app then belongs to the user, so Put Back, Undo and emptying the Trash
+/// work as for any other item. Finder cannot do this when scripted: it refuses instead of asking.
+public struct AdminTrash: Sendable {
     public let runner: CommandRunning
-    public init(runner: CommandRunning) { self.runner = runner }
+    public let home: URL
+    public var owner = NSUserName()
+
+    public init(runner: CommandRunning, home: URL) { self.runner = runner; self.home = home }
 
     public struct Failure: LocalizedError {
         public let message: String
@@ -161,29 +168,28 @@ public struct FinderTrash: Sendable {
         return posix == Int(EACCES) || posix == Int(EPERM)
     }
 
-    public static func script(_ path: String) -> String {
-        let quoted = path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        return """
-        tell application "Finder"
-            set trashed to delete (POSIX file "\(quoted)" as alias)
-            return POSIX path of (trashed as alias)
-        end tell
-        """
+    /// The shell command run with administrator rights: move into the Trash under a free name, hand it to the user,
+    /// and print where it went. Every path is single-quoted.
+    public static func command(_ url: URL, trash: URL, owner: String, stamp: String) -> String {
+        let q = AdminScript.shellQuote
+        let name = url.lastPathComponent
+        let spare = url.deletingPathExtension().lastPathComponent + " " + stamp + "." + url.pathExtension
+        return "d=\(q(trash.appendingPathComponent(name).path)); "
+            + "if [ -e \"$d\" ]; then d=\(q(trash.appendingPathComponent(spare).path)); fi; "
+            + "/bin/mv \(q(url.path)) \"$d\" && /usr/sbin/chown -R \(q(owner)) \"$d\" && printf '%s' \"$d\""
     }
 
     /// Returns where the app landed in the Trash.
     public func trash(_ url: URL) throws -> URL? {
-        let r = runner.run("/usr/bin/osascript", ["-e", Self.script(url.path)])
+        let f = DateFormatter(); f.dateFormat = "HH.mm.ss"
+        let r = runner.runAsAdmin(Self.command(url, trash: home.appendingPathComponent(".Trash"), owner: owner, stamp: f.string(from: Date())))
         if r.ok {
             let path = r.output.trimmingCharacters(in: .whitespacesAndNewlines)
             return path.isEmpty ? nil : URL(fileURLWithPath: path)
         }
         if r.error.contains("-128") { throw Failure(message: "Cancelled: the administrator password was not entered") }
-        if r.error.contains("-1743") || r.error.contains("-10004") {
-            throw Failure(message: "MyOpenCleaner may not ask Finder: allow it in System Settings → Privacy & Security → Automation")
-        }
         let why = r.error.trimmingCharacters(in: .whitespacesAndNewlines)
-        throw Failure(message: why.isEmpty ? "Finder could not move it to the Trash" : why)
+        throw Failure(message: why.isEmpty ? "Could not move it to the Trash" : why)
     }
 }
 

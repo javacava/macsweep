@@ -4,8 +4,6 @@
 <dict>
 	<key>CFBundleName</key>
 	<string>MyOpenCleaner</string>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>MyOpenCleaner asks Finder to move apps that belong to an administrator to the Trash. Finder then asks for the password, as it does when you drag such an app to the Trash.</string>
 	<key>CFBundleDisplayName</key>
 	<string>MyOpenCleaner</string>
 	<key>CFBundleExecutable</key>

@@ -284,54 +284,56 @@ import Testing
     }
 }
 
-/// Apps installed by a .pkg belong to root: the user may not move them, so Finder is asked (with a password).
-@Suite struct FinderTrashTests {
-    @Test func onlyAppsRefusedForPermissionsGoThroughFinder() {
-        let denied = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError)
+/// Apps installed by a .pkg belong to root: the user may not move them, so macOS asks for an administrator's password.
+@Suite struct AdminTrashTests {
+    @Test func onlyAppsRefusedForPermissionsNeedThePassword() {
+        let denied = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError,
+                             userInfo: [NSUnderlyingErrorKey: NSError(domain: NSOSStatusErrorDomain, code: -5000)])
         let posix = NSError(domain: NSCocoaErrorDomain, code: 512,
                             userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES))])
         let missing = NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError)
         let app = URL(fileURLWithPath: "/Applications/Some Tool.app")
-        #expect(FinderTrash.isNeeded(for: app, after: denied))
-        #expect(FinderTrash.isNeeded(for: app, after: posix))
-        #expect(!FinderTrash.isNeeded(for: app, after: missing), "a missing file is not a permission problem")
-        #expect(!FinderTrash.isNeeded(for: URL(fileURLWithPath: "/Library/Caches/x"), after: denied), "never for other files")
+        #expect(AdminTrash.isNeeded(for: app, after: denied), "what trashItem really returns for a root-owned folder")
+        #expect(AdminTrash.isNeeded(for: app, after: posix))
+        #expect(!AdminTrash.isNeeded(for: app, after: missing), "a missing file is not a permission problem")
+        #expect(!AdminTrash.isNeeded(for: URL(fileURLWithPath: "/Library/Caches/x"), after: denied), "never for other files")
     }
 
-    @Test func scriptQuotesThePath() {
-        let s = FinderTrash.script(#"/Applications/A "quoted" \ app.app"#)
-        #expect(s.contains(#"POSIX file "/Applications/A \"quoted\" \\ app.app""#))
-        #expect(s.contains("delete") && s.contains("return POSIX path"))
+    @Test func commandQuotesEveryPathAndHandsTheAppToTheUser() {
+        let c = AdminTrash.command(URL(fileURLWithPath: "/Applications/It's \"odd\".app"),
+                                   trash: URL(fileURLWithPath: "/Users/me/.Trash"), owner: "me", stamp: "21.10.00")
+        #expect(c.contains(#"/bin/mv '/Applications/It'\''s "odd".app' "$d""#))
+        #expect(c.contains(#"d='/Users/me/.Trash/It'\''s "odd".app'"#))
+        #expect(c.contains(#"'/Users/me/.Trash/It'\''s "odd" 21.10.00.app'"#), "a free name when the Trash has one already")
+        #expect(c.contains("/usr/sbin/chown -R 'me'"))
+        #expect(!c.contains("rm "), "it moves, never deletes")
     }
 
     @Test func reportsWhereTheAppLandedAndWhyItFailed() throws {
         let runner = FakeRunner()
-        runner.defaultResult = CommandResult(status: 0, output: "/Users/x/.Trash/Some Tool.app\n")
-        let landed = try FinderTrash(runner: runner).trash(URL(fileURLWithPath: "/Applications/Some Tool.app"))
+        let admin = AdminTrash(runner: runner, home: URL(fileURLWithPath: "/Users/x"))
+        runner.defaultResult = CommandResult(status: 0, output: "/Users/x/.Trash/Some Tool.app")
+        let landed = try admin.trash(URL(fileURLWithPath: "/Applications/Some Tool.app"))
         #expect(landed?.path == "/Users/x/.Trash/Some Tool.app")
         #expect(runner.calls.first?.first == "/usr/bin/osascript")
+        #expect(runner.calls.first?.last?.contains("with administrator privileges") == true)
 
         runner.defaultResult = CommandResult(status: 1, error: "execution error: User canceled. (-128)")
-        #expect(throws: FinderTrash.Failure.self) { try FinderTrash(runner: runner).trash(URL(fileURLWithPath: "/Applications/X.app")) }
-        do { _ = try FinderTrash(runner: runner).trash(URL(fileURLWithPath: "/Applications/X.app")) } catch {
+        do { _ = try admin.trash(URL(fileURLWithPath: "/Applications/X.app")); Issue.record("should throw") } catch {
             #expect(error.localizedDescription.contains("Cancelled"))
-        }
-        runner.defaultResult = CommandResult(status: 1, error: "Not authorized to send Apple events to Finder. (-1743)")
-        do { _ = try FinderTrash(runner: runner).trash(URL(fileURLWithPath: "/Applications/X.app")) } catch {
-            #expect(error.localizedDescription.contains("Automation"))
         }
     }
 
-    @Test func aLockedAppFallsBackToFinder() throws {
+    @Test func aLockedAppAsksForThePassword() throws {
         let s = Sandbox()
         let app = s.file("~/Locked/Tool.app/Contents/Info.plist", bytes: 10).deletingLastPathComponent().deletingLastPathComponent()
         let parent = app.deletingLastPathComponent()
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: parent.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.path) }
         let runner = FakeRunner()
-        runner.defaultResult = CommandResult(status: 0, output: "/Users/x/.Trash/Tool.app\n")
-        let landed = try SystemFileRemover(runner: runner).moveToTrash(app)
+        runner.defaultResult = CommandResult(status: 0, output: s.home.appendingPathComponent(".Trash/Tool.app").path)
+        let landed = try SystemFileRemover(runner: runner, home: s.home).moveToTrash(app)
         #expect(landed?.lastPathComponent == "Tool.app")
-        #expect(runner.calls.count == 1, "Finder was asked once")
+        #expect(runner.calls.count == 1, "asked once")
     }
 }
