@@ -115,13 +115,76 @@ public protocol FileRemoving: Sendable {
 }
 
 public struct SystemFileRemover: FileRemoving {
-    public init() {}
+    let runner: CommandRunning
+
+    public init(runner: CommandRunning = ProcessRunner()) { self.runner = runner }
+
     public func moveToTrash(_ url: URL) throws -> URL? {
         var result: NSURL?
-        try FileManager.default.trashItem(at: url, resultingItemURL: &result)
-        return result as URL?
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: &result)
+            return result as URL?
+        } catch {
+            // An app installed by a .pkg belongs to the administrator: like Finder, ask for the password.
+            guard FinderTrash.isNeeded(for: url, after: error) else { throw error }
+            return try FinderTrash(runner: runner).trash(url)
+        }
     }
-    public func removePermanently(_ url: URL) throws { try FileManager.default.removeItem(at: url) }
+
+    public func removePermanently(_ url: URL) throws {
+        do { try FileManager.default.removeItem(at: url) } catch {
+            // Never delete an administrator's app outright: it goes to the Trash through Finder instead.
+            guard FinderTrash.isNeeded(for: url, after: error) else { throw error }
+            _ = try FinderTrash(runner: runner).trash(url)
+        }
+    }
+}
+
+/// Moves an app the user may not move (installed by a .pkg, owned by root) to the Trash the way Finder does:
+/// by asking Finder, which asks for an administrator's password and keeps Put Back working.
+public struct FinderTrash: Sendable {
+    public let runner: CommandRunning
+    public init(runner: CommandRunning) { self.runner = runner }
+
+    public struct Failure: LocalizedError {
+        public let message: String
+        public var errorDescription: String? { message }
+    }
+
+    /// Only apps, and only when the refusal was about permissions.
+    public static func isNeeded(for url: URL, after error: Error) -> Bool {
+        guard url.pathExtension.lowercased() == "app" else { return false }
+        let e = error as NSError
+        if e.domain == NSCocoaErrorDomain, [NSFileWriteNoPermissionError, NSFileReadNoPermissionError].contains(e.code) { return true }
+        let posix = (e.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0.code : nil }
+            ?? (e.domain == NSPOSIXErrorDomain ? e.code : nil)
+        return posix == Int(EACCES) || posix == Int(EPERM)
+    }
+
+    public static func script(_ path: String) -> String {
+        let quoted = path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        return """
+        tell application "Finder"
+            set trashed to delete (POSIX file "\(quoted)" as alias)
+            return POSIX path of (trashed as alias)
+        end tell
+        """
+    }
+
+    /// Returns where the app landed in the Trash.
+    public func trash(_ url: URL) throws -> URL? {
+        let r = runner.run("/usr/bin/osascript", ["-e", Self.script(url.path)])
+        if r.ok {
+            let path = r.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return path.isEmpty ? nil : URL(fileURLWithPath: path)
+        }
+        if r.error.contains("-128") { throw Failure(message: "Cancelled: the administrator password was not entered") }
+        if r.error.contains("-1743") || r.error.contains("-10004") {
+            throw Failure(message: "MyOpenCleaner may not ask Finder: allow it in System Settings → Privacy & Security → Automation")
+        }
+        let why = r.error.trimmingCharacters(in: .whitespacesAndNewlines)
+        throw Failure(message: why.isEmpty ? "Finder could not move it to the Trash" : why)
+    }
 }
 
 /// Something MyOpenCleaner moved to the Trash, and where it came from, so it can be put back.
