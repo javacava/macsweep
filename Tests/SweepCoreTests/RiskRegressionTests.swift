@@ -306,6 +306,7 @@ import Testing
         #expect(c.contains(#"d='/Users/me/.Trash/It'\''s "odd".app'"#))
         #expect(c.contains(#"'/Users/me/.Trash/It'\''s "odd" 21.10.00.app'"#), "a free name when the Trash has one already")
         #expect(c.contains("/usr/sbin/chown -R 'me'"))
+        #expect(c.contains("2>/dev/null; printf"), "a protected App Store bundle may refuse chown; the move still counts")
         #expect(!c.contains("rm "), "it moves, never deletes")
     }
 

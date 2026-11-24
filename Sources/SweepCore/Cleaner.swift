@@ -176,7 +176,9 @@ public struct AdminTrash: Sendable {
         let spare = url.deletingPathExtension().lastPathComponent + " " + stamp + "." + url.pathExtension
         return "d=\(q(trash.appendingPathComponent(name).path)); "
             + "if [ -e \"$d\" ]; then d=\(q(trash.appendingPathComponent(spare).path)); fi; "
-            + "/bin/mv \(q(url.path)) \"$d\" && /usr/sbin/chown -R \(q(owner)) \"$d\" && printf '%s' \"$d\""
+            // Handing the app to the user is best effort: macOS protects the insides of App Store apps even
+            // from root, but owning the top folder is what Put Back needs. The move alone decides success.
+            + "/bin/mv \(q(url.path)) \"$d\" && { /usr/sbin/chown -R \(q(owner)) \"$d\" 2>/dev/null; printf '%s' \"$d\"; }"
     }
 
     /// Returns where the app landed in the Trash.
