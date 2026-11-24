@@ -195,6 +195,22 @@ public struct AdminTrash: Sendable {
     }
 }
 
+/// Sandboxed apps keep their data in ~/Library/Containers and Group Containers, which macOS protects from
+/// every other app, administrators included. Full Disk Access lifts that protection.
+public enum ProtectedData {
+    public static let reason = "macOS protects this app's data. Give MyOpenCleaner Full Disk Access, open it again and retry."
+
+    public static func isProtected(_ url: URL, error: Error, home: URL) -> Bool {
+        let roots = ["Library/Containers", "Library/Group Containers"].map { home.appendingPathComponent($0) }
+        guard roots.contains(where: { url.isInside($0) }) else { return false }
+        let e = error as NSError
+        if e.domain == NSCocoaErrorDomain, [NSFileWriteNoPermissionError, NSFileReadNoPermissionError].contains(e.code) { return true }
+        let posix = (e.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0.code : nil }
+            ?? (e.domain == NSPOSIXErrorDomain ? e.code : nil)
+        return posix == Int(EACCES) || posix == Int(EPERM)
+    }
+}
+
 /// Something MyOpenCleaner moved to the Trash, and where it came from, so it can be put back.
 public struct TrashedItem: Codable, Equatable, Sendable {
     public let original: URL
@@ -257,7 +273,8 @@ public struct Cleaner: Sendable {
                 report.freedBytes += t.size
                 taken.append(t.url)
             } catch {
-                report.failed.append((t.url, error.localizedDescription))
+                report.failed.append((t.url, ProtectedData.isProtected(t.url, error: error, home: safety.env.home)
+                                      ? ProtectedData.reason : error.localizedDescription))
             }
         }
         return report

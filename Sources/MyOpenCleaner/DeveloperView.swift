@@ -81,9 +81,7 @@ struct DeveloperView: View {
             Text(dockerSelected.sorted { $0.rawValue < $1.rawValue }.map(\.title).joined(separator: ", ")
                  + (dockerSelected.contains(where: \.dangerous) ? ". Warning: some selected items lose data that cannot be restored." : "."))
         }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func section(_ group: DevItem.Group, _ rows: [DevItem]) -> some View {

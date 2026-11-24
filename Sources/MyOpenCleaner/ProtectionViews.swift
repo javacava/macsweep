@@ -55,9 +55,7 @@ struct MalwareView: View {
         .confirmationDialog("Remove \(chosen.count) items?", isPresented: $confirm) {
             Button("Stop and remove", role: .destructive, action: remove)
         } message: { Text("The processes are stopped and their launch files removed. System items need a password.") }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func threatRow(_ t: Threat) -> some View {
@@ -224,9 +222,7 @@ struct PrivacyView: View {
         .confirmationDialog("Clear the selection?", isPresented: $confirm) {
             Button("Clean", role: .destructive, action: clean)
         } message: { Text("Quit browsers before clearing. Removing cookies signs you out of websites.") }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func scan() {

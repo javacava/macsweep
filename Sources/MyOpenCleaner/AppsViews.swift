@@ -74,9 +74,7 @@ struct UninstallerView: View {
         } message: {
             Text((inUse.map { $0 + "\n\n" } ?? "") + (removeApp ? "The app and the selected leftovers will be removed." : "The app's settings and data will be removed; the app itself stays."))
         }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     @ViewBuilder var detail: some View {
@@ -217,9 +215,7 @@ struct LeftoversView: View {
         .confirmationDialog("Remove \(chosen.count) items?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: clean)
         } message: { if let inUse { Text(inUse) } }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func scan() {

@@ -66,9 +66,7 @@ struct LargeOldView: View {
         .confirmationDialog("Remove \(chosen.count) files?", isPresented: $confirm) {
             Button("Remove", role: .destructive) { remove(chosen.map { ($0.url, $0.size) }) }
         } message: { if let inUse { Text(inUse) } }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func scan() {
@@ -160,9 +158,7 @@ struct DuplicatesView: View {
         .confirmationDialog("Remove \(chosen.count) copies?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
         } message: { if let inUse { Text(inUse) } }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func chooseFolder() {
@@ -259,9 +255,7 @@ struct SimilarView: View {
         .confirmationDialog("Remove \(chosen.count) files?", isPresented: $confirm) {
             Button("Remove", role: .destructive, action: remove)
         } message: { if let inUse { Text(inUse) } }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func thumb(_ f: FileEntry) -> some View {
@@ -380,9 +374,7 @@ struct SpaceMapView: View {
                 if let top = stack.last { load(top.url, reset: false, replace: true) }
             }
         }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func open(_ n: DiskNode) {
@@ -475,9 +467,7 @@ struct CloudView: View {
             }
         }
         .onAppear { if AppState.shared.autoScan, files == nil, !busy { scan() } }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func scan() {

@@ -320,3 +320,21 @@ struct SelectAllBar<ID: Hashable>: View {
         .padding(.horizontal, 20).padding(.vertical, 8)
     }
 }
+
+/// The "Done" alert after a clean. When macOS protected some of the files, it offers the Full Disk Access settings.
+struct DoneAlert: ViewModifier {
+    @Binding var message: String?
+
+    func body(content: Content) -> some View {
+        content.alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            if message?.contains(ProtectedData.reason) == true {
+                Button("Open Full Disk Access") { AppState.openFullDiskAccessSettings() }
+            }
+            Button("OK") {}
+        } message: { Text(message ?? "") }
+    }
+}
+
+extension View {
+    func doneAlert(_ message: Binding<String?>) -> some View { modifier(DoneAlert(message: message)) }
+}

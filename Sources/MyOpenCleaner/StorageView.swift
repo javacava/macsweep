@@ -75,9 +75,7 @@ struct StorageView: View {
             Text((inUse.map { $0 + "\n\n" } ?? "") + "\(chosen.count) items."
                  + (review > 0 ? " \(review) of them are marked Check first: they may hold your own work." : ""))
         }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func askConfirm() {

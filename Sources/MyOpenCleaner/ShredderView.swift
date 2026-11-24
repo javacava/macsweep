@@ -93,9 +93,7 @@ struct ShredderView: View {
         .confirmationDialog("Shred \(queue.items.count) items permanently?", isPresented: $confirm) {
             Button("Shred", role: .destructive, action: shred)
         } message: { Text((inUse.map { $0 + "\n\n" } ?? "") + "They will not go to the Trash and cannot be recovered.") }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     var dropZone: some View {

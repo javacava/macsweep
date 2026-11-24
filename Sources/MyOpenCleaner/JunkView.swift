@@ -61,9 +61,7 @@ struct JunkView: View {
         } message: {
             Text((inUse.map { $0 + "\n\n" } ?? "") + "Apps rebuild the caches they need. Quit browsers before clearing their caches.")
         }
-        .alert("Done", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") {}
-        } message: { Text(message ?? "") }
+        .doneAlert($message)
     }
 
     func categorySection(_ cat: JunkCategory, _ r: JunkScanResult) -> some View {

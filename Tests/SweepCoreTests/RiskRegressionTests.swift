@@ -338,3 +338,26 @@ import Testing
         #expect(runner.calls.count == 1, "asked once")
     }
 }
+
+/// Other apps' containers are protected by macOS; the report says how to allow it instead of a bare error.
+@Suite struct ProtectedDataTests {
+    @Test func containerRefusalsPointToFullDiskAccess() throws {
+        let s = Sandbox()
+        let item = s.file("~/Library/Containers/com.example.Other/Data/Library/Caches/x", bytes: 10).deletingLastPathComponent()
+        let parent = item.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: parent.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.path) }
+        let report = Cleaner(env: s.env, remover: SystemFileRemover(runner: FakeRunner(), home: s.home), mode: .trash)
+            .remove([(item, 10)])
+        #expect(report.failed.first?.reason == ProtectedData.reason)
+    }
+
+    @Test func onlyPermissionErrorsInContainersCount() {
+        let home = URL(fileURLWithPath: "/Users/x")
+        let denied = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError)
+        let missing = NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError)
+        #expect(ProtectedData.isProtected(URL(fileURLWithPath: "/Users/x/Library/Group Containers/G.com.x/a"), error: denied, home: home))
+        #expect(!ProtectedData.isProtected(URL(fileURLWithPath: "/Users/x/Library/Containers/com.x/a"), error: missing, home: home))
+        #expect(!ProtectedData.isProtected(URL(fileURLWithPath: "/Users/x/Library/Caches/a"), error: denied, home: home))
+    }
+}
